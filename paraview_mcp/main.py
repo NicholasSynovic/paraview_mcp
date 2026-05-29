@@ -20,8 +20,7 @@ import sys
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Image
-
-from paraview_mcp.paraview_manager import ParaViewManager
+from paraview_manager import ParaViewManager
 
 # Configure logging
 log_dir = Path.home() / "paraview_logs"
@@ -53,7 +52,7 @@ logger = logging.getLogger("pv_external_mcp")
 pv_manager = ParaViewManager()
 
 # Initialize FastMCP server for Claude Desktop integration with default prompt
-mcp = FastMCP("ParaView", system_prompt=default_prompt)
+mcp = FastMCP("ParaView", instructions=default_prompt)
 
 # ============================================================================
 # MCP Tools for ParaView
