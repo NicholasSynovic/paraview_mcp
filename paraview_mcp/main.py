@@ -12,10 +12,11 @@ Usage:
 3. Configure Claude Desktop to use this script
 
 """
+
+import argparse
+import logging
 import os
 import sys
-import logging
-import argparse
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Image
@@ -28,18 +29,15 @@ log_file = log_dir / "paraview_mcp_external.log"
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
 )
 
 # Default prompt that instructs Claude how to interact with ParaView
 default_prompt = """
 When using ParaView through this interface, please follow these guidelines:
 
-1. IMPORTANT: Only call strictly necessary ParaView functions per reply (and please limit the total number of call per reply). This ensures operations execute in a more interative manner and no excessive calls to related but non-essential functions. 
+1. IMPORTANT: Only call strictly necessary ParaView functions per reply (and please limit the total number of call per reply). This ensures operations execute in a more interative manner and no excessive calls to related but non-essential functions.
 
 2. The only execute multiple repeated function call when given a target goal (e.g., identify a specific object), where different parameters need to used (e.g., isosurface with different isovalue). Avoid repeated calling of color map function unless user specific ask for color map design.
 
@@ -47,7 +45,7 @@ When using ParaView through this interface, please follow these guidelines:
 
 
 """
-    
+
 logger = logging.getLogger("pv_external_mcp")
 
 # Create the ParaView manager
@@ -60,14 +58,15 @@ mcp = FastMCP("ParaView", system_prompt=default_prompt)
 # MCP Tools for ParaView
 # ============================================================================
 
+
 @mcp.tool()
 def load_data(file_path: str) -> str:
     """
     Load data from a file into ParaView.
-    
+
     Args:
         file_path: Path to the data file (supports VTK, EXODUS, CSV, RAW, etc.)
-    
+
     Returns:
         Status message
     """
@@ -76,6 +75,7 @@ def load_data(file_path: str) -> str:
         return f"{message}. Source registered as '{source_name}'."
     else:
         return message
+
 
 @mcp.tool()
 def save_contour_as_stl(stl_filename: str = "contour.stl") -> str:
@@ -92,14 +92,15 @@ def save_contour_as_stl(stl_filename: str = "contour.stl") -> str:
     success, message, path = pv_manager.save_contour_as_stl(stl_filename)
     return message
 
+
 @mcp.tool()
 def create_source(source_type: str) -> str:
     """
     Create a new geometric source.
-    
+
     Args:
         source_type: Type of source to create (Sphere, Cone, Cylinder, Plane, Box)
-    
+
     Returns:
         Status message
     """
@@ -109,65 +110,71 @@ def create_source(source_type: str) -> str:
     else:
         return message
 
+
 @mcp.tool()
 def create_isosurface(value: float, field: str = None) -> str:
     """
     Create an isosurface visualization of the active source.
-    
+
     Args:
         value: Isovalue
         field: Optional field name to contour by
-    
+
     Returns:
         Status message
     """
-    success, message, contour_obj, contour_name = pv_manager.create_isosurface(value, field)
+    success, message, contour_obj, contour_name = pv_manager.create_isosurface(
+        value, field
+    )
     if success:
         # Return a user-friendly message that also includes the name
         return f"{message}. Filter registered as '{contour_name}'."
     else:
         return message
 
+
 @mcp.tool()
-def create_slice(origin_x: float = None, origin_y: float = None, origin_z: float = None,
-                 normal_x: float = 0, normal_y: float = 0, normal_z: float = 1) -> str:
+def create_slice(
+    origin_x: float = None,
+    origin_y: float = None,
+    origin_z: float = None,
+    normal_x: float = 0,
+    normal_y: float = 0,
+    normal_z: float = 1,
+) -> str:
     """
     Create a slice through the loaded volume data.
-    
+
     Args:
         origin_x, origin_y, origin_z: Coordinates for the slice plane's origin. If None,
             defaults to the data set's center.
         normal_x, normal_y, normal_z: Normal vector for the slice plane (default [0, 0, 1]).
-    
+
     Returns:
         A string message containing success/failure details, plus the pipeline name.
     """
     success, message, slice_filter, slice_name = pv_manager.create_slice(
-        origin_x,
-        origin_y,
-        origin_z,
-        normal_x,
-        normal_y,
-        normal_z
+        origin_x, origin_y, origin_z, normal_x, normal_y, normal_z
     )
 
     # Return either an error message or a success message including the slice's name
     return message if success else f"Error creating slice: {message}"
 
+
 @mcp.tool()
 def toggle_volume_rendering(enable: bool = True) -> str:
     """
     Toggle the visibility of volume rendering for the active source.
-    
+
     Args:
         enable (bool): Whether to show (True) or hide (False) volume rendering.
                       If True, shows volume rendering (switching to 'Volume' representation if needed).
                       If False, hides the volume but preserves the volume representation settings.
-    
+
     Returns:
         Status message
     """
-       
+
     success, message, source_name = pv_manager.create_volume_rendering(enable)
     if success:
         # Return a user-friendly message that also includes the name
@@ -175,20 +182,21 @@ def toggle_volume_rendering(enable: bool = True) -> str:
     else:
         return message
 
+
 @mcp.tool()
 def toggle_visibility(enable: bool = True) -> str:
     """
     Toggle the visibility for the active source.
-    
+
     Args:
         enable (bool): Whether to show (True) or hide (False) the active source.
                       If True, makes the active source visible.
                       If False, hides the active source but preserves the representation settings.
-    
+
     Returns:
         Status message
     """
-       
+
     success, message, source_name = pv_manager.toggle_visibility(enable)
     if success:
         # Return a user-friendly message that also includes the name
@@ -210,6 +218,7 @@ def set_active_source(name: str) -> str:
     success, message = pv_manager.set_active_source(name)
     return message
 
+
 @mcp.tool()
 def get_active_source_names_by_type(source_type: str = None) -> str:
     """
@@ -222,14 +231,17 @@ def get_active_source_names_by_type(source_type: str = None) -> str:
     Returns:
         A string message containing the source names or error message.
     """
-    success, message, source_names = pv_manager.get_active_source_names_by_type(source_type)
-    
+    success, message, source_names = pv_manager.get_active_source_names_by_type(
+        source_type
+    )
+
     if success and source_names:
         sources_list = "\n- ".join(source_names)
         result = f"{message}:\n- {sources_list}"
         return result
     else:
         return message
+
 
 # @mcp.tool()
 # def edit_volume_opacity(field_name: str, opacity_points: list) -> str:
@@ -250,6 +262,7 @@ def get_active_source_names_by_type(source_type: str = None) -> str:
 #     success, message = pv_manager.edit_volume_opacity(field_name, opacity_points)
 #     return message
 
+
 # Compatible with OpenAI tool using
 @mcp.tool()
 def edit_volume_opacity(field_name: str, opacity_points: list[dict[str, float]]) -> str:
@@ -267,6 +280,7 @@ def edit_volume_opacity(field_name: str, opacity_points: list[dict[str, float]])
     formatted_points = [[pt["value"], pt["alpha"]] for pt in opacity_points]
     success, message = pv_manager.edit_volume_opacity(field_name, formatted_points)
     return message
+
 
 # @mcp.tool()
 # def set_color_map(field_name: str, color_points: list) -> str:
@@ -286,6 +300,7 @@ def edit_volume_opacity(field_name: str, opacity_points: list[dict[str, float]])
 #     """
 #     success, message = pv_manager.set_color_map(field_name, color_points)
 #     return message
+
 
 # Compatible with OpenAI tool using
 @mcp.tool()
@@ -326,17 +341,18 @@ def color_by(field: str, component: int = -1) -> str:
     Color the active visualization by a specific field.
     This function first checks if the active source can be colored by fields
     (i.e., it's a dataset with arrays) before attempting to apply colors.
-    [tips] Volume rendering should not use this function 
+    [tips] Volume rendering should not use this function
 
     Args:
         field: Field name to color by
         component: Component to color by (-1 for magnitude)
-    
+
     Returns:
         Status message
     """
     success, message = pv_manager.color_by(field, component)
     return message
+
 
 @mcp.tool()
 def compute_surface_area() -> str:
@@ -347,6 +363,7 @@ def compute_surface_area() -> str:
     success, message, area_value = pv_manager.compute_surface_area()
     return message
 
+
 # @mcp.tool()
 # def set_color_map_preset(preset_name: str) -> str:
 #     """
@@ -355,39 +372,42 @@ def compute_surface_area() -> str:
 
 #     Args:
 #         preset_name: Name of the color map preset (e.g., "Rainbow", "Cool to Warm", "viridis")
-    
+
 #     Returns:
 #         Status message
 #     """
 #     success, message = pv_manager.set_color_map(preset_name)
 #     return message
 
+
 @mcp.tool()
 def set_representation_type(rep_type: str) -> str:
     """
     Set the representation type for the active source.
-    
+
     [Tips: This function should not be used for volume rendering]
 
     Args:
         rep_type: Representation type (Surface, Wireframe, Points, etc.)
-    
+
     Returns:
         Status message
     """
     success, message = pv_manager.set_representation_type(rep_type)
     return message
 
+
 @mcp.tool()
 def get_pipeline() -> str:
     """
     Get the current pipeline structure.
-    
+
     Returns:
         Description of the current pipeline
     """
     success, message = pv_manager.get_pipeline()
     return message
+
 
 @mcp.tool()
 def get_available_arrays() -> str:
@@ -395,30 +415,36 @@ def get_available_arrays() -> str:
     Get a list of available arrays in the active source.
 
     [tips: normally volume rendering would not require this information]
-    
+
     Returns:
         List of available arrays
     """
     success, message = pv_manager.get_available_arrays()
     return message
 
+
 @mcp.tool()
-def create_streamline(seed_point_number: int, vector_field: str = None,
-                     integration_direction: str = "BOTH", max_steps: int = 1000,
-                     initial_step: float = 0.1, maximum_step: float = 50.0) -> str:
+def create_streamline(
+    seed_point_number: int,
+    vector_field: str = None,
+    integration_direction: str = "BOTH",
+    max_steps: int = 1000,
+    initial_step: float = 0.1,
+    maximum_step: float = 50.0,
+) -> str:
     """
     Create streamlines from the loaded vector volume using the StreamTracer filter.
     This function automatically generates seed points based on the data bounds.
-    
+
     Args:
         seed_point_number (int): The number of seed points to automatically generate.
-        vector_field (str, optional): The name of the vector field to use for tracing. 
+        vector_field (str, optional): The name of the vector field to use for tracing.
                                     If None, the first vector field will be chosen automatically.
         integration_direction (str): Integration direction ("FORWARD", "BACKWARD", or "BOTH"; default: "BOTH").
         max_steps (int): Maximum number of integration steps (default: 1000).
         initial_step (float): Initial integration step length (default: 0.1).
         maximum_step (float): Maximum streamline length (default: 50.0).
-        
+
     Returns:
         str: Status message indicating whether the streamline was successfully created.
     """
@@ -430,57 +456,61 @@ def create_streamline(seed_point_number: int, vector_field: str = None,
         integration_direction=integration_direction,
         initial_step_length=initial_step,
         maximum_stream_length=maximum_step,
-        number_of_streamlines=seed_point_number
+        number_of_streamlines=seed_point_number,
     )
-    
+
     if success:
         return f"{message} Tube registered as '{tube_name}'."
     else:
         return message
 
+
 @mcp.tool()
 def get_screenshot() -> str:
     """
     Capture a screenshot of the current view and display it in chat.
-    
+
     Args:
         display_in_chat: Whether to return the image data for display in chat
-    
+
     Returns:
         Image data or path
     """
-    success, message, img_path = pv_manager.get_screenshot()    
+    success, message, img_path = pv_manager.get_screenshot()
 
     if not success:
         return message
     else:
         return Image(path=img_path)
-    
+
+
 @mcp.tool()
 def rotate_camera(azimuth: float = 30.0, elevation: float = 0.0) -> str:
     """
     Rotate the camera by specified angles.
-    
+
     Args:
         azimuth: Rotation around vertical axis in degrees
         elevation: Rotation around horizontal axis in degrees
-    
+
     Returns:
         Status message
     """
     success, message = pv_manager.rotate_camera(azimuth, elevation)
     return message
 
+
 @mcp.tool()
 def reset_camera() -> str:
     """
     Reset the camera to show all data.
-    
+
     Returns:
         Status message
     """
     success, message = pv_manager.reset_camera()
     return message
+
 
 # @mcp.tool()
 # def plot_over_line(point1: list = None, point2: list = None, resolution: int = 100) -> str:
@@ -498,9 +528,12 @@ def reset_camera() -> str:
 #     success, message, plot_filter = pv_manager.plot_over_line(point1, point2, resolution)
 #     return message
 
+
 # Compatible with OpenAI tool using
 @mcp.tool()
-def plot_over_line(point1: list[float] = None, point2: list[float] = None, resolution: int = 100) -> str:
+def plot_over_line(
+    point1: list[float] = None, point2: list[float] = None, resolution: int = 100
+) -> str:
     """
     Create a 'Plot Over Line' filter to sample data along a line between two points.
 
@@ -512,8 +545,11 @@ def plot_over_line(point1: list[float] = None, point2: list[float] = None, resol
     Returns:
         Status message
     """
-    success, message, plot_filter = pv_manager.plot_over_line(point1, point2, resolution)
+    success, message, plot_filter = pv_manager.plot_over_line(
+        point1, point2, resolution
+    )
     return message
+
 
 @mcp.tool()
 def warp_by_vector(vector_field: str = None, scale_factor: float = 1.0) -> str:
@@ -527,14 +563,17 @@ def warp_by_vector(vector_field: str = None, scale_factor: float = 1.0) -> str:
     Returns:
         Status message
     """
-    success, message, warp_filter = pv_manager.warp_by_vector(vector_field, scale_factor)
+    success, message, warp_filter = pv_manager.warp_by_vector(
+        vector_field, scale_factor
+    )
     return message
+
 
 @mcp.tool()
 def list_commands() -> str:
     """
     List all available commands in this ParaView MCP server.
-    
+
     Returns:
         List of available commands
     """
@@ -544,7 +583,7 @@ def list_commands() -> str:
         "create_isosurface: Create an isosurface visualization",
         "create_slice: Create a slice through the data",
         "toggle_volume_rendering: Enable or disable volume rendering",
-	    "toggle_visibility: Enable or disable visibility for the active source",
+        "toggle_visibility: Enable or disable visibility for the active source",
         "set_active_source: Set the active pipeline object by name",
         "get_active_source_names_by_type: Get a list of sources filtered by type",
         "color_by: Color the visualization by a field",
@@ -562,37 +601,50 @@ def list_commands() -> str:
         "plot_line: Plot a line through the data",
         "warp_by_vector: Warp the active source by a vector field",
     ]
-    
+
     return "Available ParaView commands:\n\n" + "\n".join(commands)
 
 
 def main():
     parser = argparse.ArgumentParser(description="ParaView External MCP Server")
-    parser.add_argument("--server", type=str, default="localhost", help="ParaView server hostname (default: localhost)")
-    parser.add_argument("--port", type=int, default=11111, help="ParaView server port (default: 11111)")
-    parser.add_argument("--paraview_package_path", type=str, help="Path to the ParaView Python package", default=None)
-    
+    parser.add_argument(
+        "--server",
+        type=str,
+        default="localhost",
+        help="ParaView server hostname (default: localhost)",
+    )
+    parser.add_argument(
+        "--port", type=int, default=11111, help="ParaView server port (default: 11111)"
+    )
+    parser.add_argument(
+        "--paraview_package_path",
+        type=str,
+        help="Path to the ParaView Python package",
+        default=None,
+    )
+
     args = parser.parse_args()
 
     # Add the ParaView package path to sys.path
     if args.paraview_package_path:
         sys.path.append(args.paraview_package_path)
-    
+
     # Connect to ParaView
     pv_manager.connect(args.server, args.port)
-    
+
     # Run the MCP server
     try:
         logger.info("Starting ParaView External MCP Server")
         logger.info(f"ParaView server: {args.server}:{args.port}")
         # logger.info("Default prompt enabled: Claude will call one function per reply")
-        
+
         # Run the MCP server
         mcp.run()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
     except Exception as e:
         logger.error(f"Error running MCP server: {str(e)}")
+
 
 if __name__ == "__main__":
     main()

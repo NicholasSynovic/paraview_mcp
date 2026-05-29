@@ -1,0 +1,35 @@
+[project]
+name = "paraview-mcp"
+version = "0.1.0"
+description = "ParaView-MCP integrates multimodal LLMs with ParaView via Model Context Protocol, enabling natural language control of scientific visualizations. The agent observes the viewport for visual feedback, making complex visualization tool accessible to all users while providing intelligent automation for experts."
+authors = [{ name = "Nicholas M. Synovic", email = "nicholas.synovic@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.27.2",
+]
+keywords = [
+    "research",
+    "AI",
+    "software engineering",
+    "science",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.14"
+]
+
+[project.urls]
+Homepage = "https://github.com/NicholasSynovic/paraview_mcp"
+Repository = "https://github.com/NicholasSynovic/paraview_mcp"
+
+[project.scripts]
+paraview-mcp = "paraview_mcp.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 80
