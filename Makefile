@@ -7,5 +7,5 @@ build:
 create-dev:
 	pre-commit install
 	pre-commit autoupdate
-	rm -rf env
+	rm -rf .venv
 	uv sync
