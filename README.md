@@ -2,7 +2,7 @@
 
 ParaView-MCP is an autonomous agent that integrates multimodal large language models with ParaView through the Model Context Protocol, enabling users to create and manipulate scientific visualizations using natural language and visual inputs instead of complex commands or GUI operations. The system features visual feedback capabilities that allow it to observe the viewport and iteratively refine visualizations, making advanced visualization accessible to non-experts while augmenting expert workflows with intelligent automation.
 
-## Disclaimer 
+## Disclaimer
 The current implementation of the connection between the MCP server and ParaView, in both the main and dev branches, relies on synchronization between pvserver and the ParaView client. Because this feature has been deprecated in most recent ParaView versions, the ParaView application view may not display content from the pvserver instance correctly, and overall stability issues may occur.
 
 ## Video Demo
@@ -21,6 +21,9 @@ cd paraview_mcp
 conda create -n paraview_mcp python=3.10
 conda install conda-forge::paraview
 conda install mcp[cli] httpx
+
+# Install the package in editable mode to register the paraview_mcp console script:
+pip install -e .
 ```
 
 ## Setup for LLM
@@ -30,15 +33,12 @@ To set up integration with claude desktop, add the following to claude_desktop_c
 ```json
     "mcpServers": {
       "ParaView": {
-        "command": "/path/to/python",
-        "args": [
-        "/path/to/paraview_mcp/paraview_mcp_server.py"
-        ]
+        "command": "paraview_mcp"
       }
     }
 ```
 
-## running 
+## running
 
 ### 1. Start paraview server
 
@@ -48,7 +48,7 @@ python pvserver --multi-clients
 
 ### 2. Connect to paraview server from paraview GUI (file -> connect)
 
-### 3. Start claude desktop app 
+### 3. Start claude desktop app
 
 ***
 
@@ -67,7 +67,7 @@ S. Liu, H. Miao, and P.-T. Bremer, “Paraview-MCP: Autonomous Visualization Age
 }
 ```
 
-## Authors 
+## Authors
 Paraview_MCP was created by Shusen Liu (liu42@llnl.gov) and Haichao Miao (miao1@llnl.gov)
 
 ## License

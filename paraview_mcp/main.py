@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Image
-from paraview_manager import ParaViewManager
+
+from paraview_mcp.paraview_manager import ParaViewManager
 
 # Configure logging
 log_dir = Path.home() / "paraview_logs"
