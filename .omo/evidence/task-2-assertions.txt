@@ -1,0 +1,14 @@
+Re-running diff assertions with literal tabs
+FAIL: addition of .PHONY: build create-dev - missing expected addition line
+Found similar lines:
+6:+.PHONY: build create-dev
+PASS: addition of conda env update --file environment.yaml --prune
+PASS: addition of conda run -n paraview_mcp pre-commit install
+PASS: addition of conda run -n paraview_mcp uv sync
+FAIL: removal of conda init - missing expected removal line
+Found similar lines:
+FAIL: removal of conda create --file environment.yaml - missing expected removal line
+Found similar lines:
+PASS: removal of pre-commit autoupdate
+PASS: no removal of uv build
+PASS: no removal of uv pip install dist

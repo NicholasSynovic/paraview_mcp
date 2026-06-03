@@ -1,0 +1,4 @@
+conda env update --file environment.yaml --prune
+conda run -n paraview_mcp pre-commit install
+rm -rf .venv
+conda run -n paraview_mcp uv sync

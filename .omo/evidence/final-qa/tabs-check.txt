@@ -1,0 +1,13 @@
+.PHONY: build create-dev$
+$
+build:$
+^Irm -rf dist$
+^Igit tag | tr -s '[:blank:]' '\n' | sort | tail -n 1  | xargs -I % uv version %$
+^Iuv build$
+^Iuv pip install dist/*.tar.gz$
+$
+create-dev:$
+^Iconda env update --file environment.yaml --prune$
+^Iconda run -n paraview_mcp pre-commit install$
+^Irm -rf .venv$
+^Iconda run -n paraview_mcp uv sync$
