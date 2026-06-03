@@ -14,10 +14,10 @@ No tests, no CI.
 
 - `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed. `pip install -e .` alone gives you `mcp` + `httpx` but the server will fail to import on startup.
 - Python version signals disagree — trust the runtime constraint, not the files:
-  - `.python-version` → `3.14`
-  - `.pre-commit-config.yaml` → `python3.13`
-  - `README.md` → `conda create ... python=3.10`
-  - **In practice the python version is dictated by whatever the conda `paraview` package supports** (typically 3.10/3.11). Use that env to actually run the server. Pre-commit can use a different interpreter.
+    - `.python-version` → `3.14`
+    - `.pre-commit-config.yaml` → `python3.13`
+    - `README.md` → `conda create ... python=3.10`
+    - **In practice the python version is dictated by whatever the conda `paraview` package supports** (typically 3.10/3.11). Use that env to actually run the server. Pre-commit can use a different interpreter.
 - If ParaView is installed outside the active env, pass `--paraview_package_path /path/to/site-packages` and `main.py` will `sys.path.append` it before importing.
 - Logs are written to `~/paraview_logs/paraview_mcp_external.log` (created on import of `main.py`). Don't expect logs in the repo.
 

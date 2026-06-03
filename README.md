@@ -104,12 +104,18 @@ Add the following to `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "mcp": {
-    "paraview": {
-      "type": "local",
-      "command": ["paraview-mcp", "--server", "localhost", "--port", "11111"]
+    "mcp": {
+        "paraview": {
+            "type": "local",
+            "command": [
+                "paraview-mcp",
+                "--server",
+                "localhost",
+                "--port",
+                "11111"
+            ]
+        }
     }
-  }
 }
 ```
 
@@ -119,12 +125,12 @@ Add the following to `.mcp.json` in your project root (or `~/.claude/mcp.json` f
 
 ```json
 {
-  "mcpServers": {
-    "paraview": {
-      "command": "paraview-mcp",
-      "args": ["--server", "localhost", "--port", "11111"]
+    "mcpServers": {
+        "paraview": {
+            "command": "paraview-mcp",
+            "args": ["--server", "localhost", "--port", "11111"]
+        }
     }
-  }
 }
 ```
 
@@ -134,12 +140,12 @@ Add the following block to `claude_desktop_config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "ParaView": {
-      "command": "paraview-mcp",
-      "args": ["--server", "localhost", "--port", "11111"]
+    "mcpServers": {
+        "ParaView": {
+            "command": "paraview-mcp",
+            "args": ["--server", "localhost", "--port", "11111"]
+        }
     }
-  }
 }
 ```
 
@@ -149,62 +155,62 @@ All tools are defined in `paraview_mcp/main.py` as `@mcp.tool()` functions and d
 
 ### Connection
 
-| Tool | Description |
-|------|-------------|
-| *(connection is automatic on startup)* | `paraview-mcp` connects to `pvserver` when launched; no explicit connect tool is needed. |
+| Tool                                   | Description                                                                              |
+| -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| _(connection is automatic on startup)_ | `paraview-mcp` connects to `pvserver` when launched; no explicit connect tool is needed. |
 
 ### Data Sources
 
-| Tool | Description |
-|------|-------------|
-| `load_data` | Load a data file into ParaView (VTK, EXODUS, CSV, RAW, and more). |
+| Tool            | Description                                                         |
+| --------------- | ------------------------------------------------------------------- |
+| `load_data`     | Load a data file into ParaView (VTK, EXODUS, CSV, RAW, and more).   |
 | `create_source` | Create a new geometric source (Sphere, Cone, Cylinder, Plane, Box). |
 
 ### Filters
 
-| Tool | Description |
-|------|-------------|
-| `create_isosurface` | Generate an isosurface (contour) at a given scalar value. |
-| `create_slice` | Slice the active volume with a plane defined by origin and normal. |
-| `create_streamline` | Trace streamlines through a vector field using the StreamTracer filter. |
-| `warp_by_vector` | Apply the Warp By Vector filter to deform geometry along a vector field. |
-| `plot_over_line` | Sample data values along a line between two points. |
-| `compute_surface_area` | Compute the surface area of the currently active dataset. |
+| Tool                   | Description                                                              |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `create_isosurface`    | Generate an isosurface (contour) at a given scalar value.                |
+| `create_slice`         | Slice the active volume with a plane defined by origin and normal.       |
+| `create_streamline`    | Trace streamlines through a vector field using the StreamTracer filter.  |
+| `warp_by_vector`       | Apply the Warp By Vector filter to deform geometry along a vector field. |
+| `plot_over_line`       | Sample data values along a line between two points.                      |
+| `compute_surface_area` | Compute the surface area of the currently active dataset.                |
 
 ### Visualization / Color
 
-| Tool | Description |
-|------|-------------|
-| `toggle_volume_rendering` | Show or hide volume rendering for the active source. |
-| `toggle_visibility` | Show or hide the active source without changing its representation. |
-| `set_representation_type` | Switch between Surface, Wireframe, Points, and other representations. |
-| `color_by` | Color the active visualization by a named scalar or vector field. |
-| `set_color_map` | Define a custom RGB color transfer function for a field (volume rendering). |
-| `edit_volume_opacity` | Edit the opacity transfer function for a scalar field (volume rendering). |
+| Tool                      | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `toggle_volume_rendering` | Show or hide volume rendering for the active source.                        |
+| `toggle_visibility`       | Show or hide the active source without changing its representation.         |
+| `set_representation_type` | Switch between Surface, Wireframe, Points, and other representations.       |
+| `color_by`                | Color the active visualization by a named scalar or vector field.           |
+| `set_color_map`           | Define a custom RGB color transfer function for a field (volume rendering). |
+| `edit_volume_opacity`     | Edit the opacity transfer function for a scalar field (volume rendering).   |
 
 ### Camera
 
-| Tool | Description |
-|------|-------------|
-| `rotate_camera` | Rotate the camera by azimuth and/or elevation angles. |
-| `reset_camera` | Reset the camera to fit all visible data in the viewport. |
+| Tool            | Description                                               |
+| --------------- | --------------------------------------------------------- |
+| `rotate_camera` | Rotate the camera by azimuth and/or elevation angles.     |
+| `reset_camera`  | Reset the camera to fit all visible data in the viewport. |
 
 ### Export
 
-| Tool | Description |
-|------|-------------|
-| `save_contour_as_stl` | Save the active surface or contour as an STL file. |
-| `get_screenshot` | Capture a screenshot of the current viewport and return it inline in chat. |
+| Tool                  | Description                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| `save_contour_as_stl` | Save the active surface or contour as an STL file.                         |
+| `get_screenshot`      | Capture a screenshot of the current viewport and return it inline in chat. |
 
 ### Utility
 
-| Tool | Description |
-|------|-------------|
-| `get_pipeline` | Return a description of the current pipeline hierarchy. |
-| `get_available_arrays` | List the scalar and vector arrays available on the active source. |
-| `set_active_source` | Set the active pipeline object by its registered name. |
+| Tool                              | Description                                                         |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `get_pipeline`                    | Return a description of the current pipeline hierarchy.             |
+| `get_available_arrays`            | List the scalar and vector arrays available on the active source.   |
+| `set_active_source`               | Set the active pipeline object by its registered name.              |
 | `get_active_source_names_by_type` | List pipeline sources filtered by type (e.g., `Contour`, `Sphere`). |
-| `list_commands` | Print all available MCP tool names and one-line descriptions. |
+| `list_commands`                   | Print all available MCP tool names and one-line descriptions.       |
 
 ## Maintenance
 
@@ -257,7 +263,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on pull requests, branch
 
 If you use ParaView-MCP in published work, please cite:
 
-S. Liu, H. Miao, and P.-T. Bremer, "Paraview-MCP: Autonomous Visualization Agents with Direct Tool Use," in *Proc. IEEE VIS 2025 Short Papers*, 2025, pp. 00.
+S. Liu, H. Miao, and P.-T. Bremer, "Paraview-MCP: Autonomous Visualization Agents with Direct Tool Use," in _Proc. IEEE VIS 2025 Short Papers_, 2025, pp. 00.
 
 ```bibtex
 @inproceedings{liu2025paraview,
