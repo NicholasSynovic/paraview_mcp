@@ -1,0 +1,2 @@
+channels: ['conda-forge', 'nodefaults']
+n_deps: 163

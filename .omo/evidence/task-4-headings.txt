@@ -1,0 +1,20 @@
+1:# ParaView-MCP
+7:## Executive Summary
+11:## Table of Contents
+31:## What is MCP?
+35:## Architecture
+46:## Prerequisites
+53:## Installation
+73:## Running
+101:## Integration: OpenCode
+116:## Integration: Claude Code
+131:## Integration: Claude Desktop
+146:## MCP Tool Reference
+209:## Maintenance
+226:## Troubleshooting / FAQ
+248:## Known Limitations
+252:## Contributing
+256:## Citation
+273:## Authors
+279:## License
+283:## Notice

@@ -1,0 +1,93 @@
+F4 Scope Fidelity Check v2 — reproducibility-and-readme
+
+Inputs reviewed:
+- Plan: .omo/plans/reproducibility-and-readme.md, tasks 1-10 specs and calibrated criteria.
+- Change inventory: git diff --stat HEAD, git status --short.
+- Project-file diffs: AGENTS.md, Makefile, README.md, environment.yaml, pyproject.toml, requirements.txt.
+- Direct reads where useful: AGENTS.md, Makefile, README.md, environment.yaml, pyproject.toml.
+- Evidence/guards: task evidence files, git diff HEAD -- NOTICE, requirements.txt absence.
+
+Change inventory:
+- Project files changed: AGENTS.md, Makefile, README.md, environment.yaml, pyproject.toml, requirements.txt deleted.
+- Framework/bookkeeping changed or untracked: .omo/boulder.json, .omo/run-continuation/*, .omo/evidence/*, .omo/notepads/*, .omo/plans/reproducibility-and-readme.md.
+- Forbidden project files changed: none. No paraview_mcp/*.py, .pre-commit-config.yaml, LICENSE, NOTICE, or CONTRIBUTING.md changes were present in git diff --stat HEAD.
+
+Per-task findings:
+
+T1 — COMPLIANT
+- Scope: read-only conda-forge availability research; evidence only.
+- Evidence exists: .omo/evidence/task-1-conda-search.txt and .omo/evidence/task-1-decision.txt.
+- Decision file contains BRANCH_A:py310h494b928_110_qt.
+- No project file changes attributable to T1.
+- Must NOT compliance: no project-file mutation detected for this task.
+
+T2 — COMPLIANT
+- Owned file: environment.yaml only.
+- Diff changes exactly match calibrated cleanup: channels changed from defaults+conda-forge to conda-forge+nodefaults; prefix removed; pre-commit==4.6.0 and uv==0.11.18 removed from pip block; paraview pin preserved as paraview=5.13.3=py310h494b928_110_qt per T1 Branch A.
+- Direct read confirms no prefix, no self-reference, no uv/pre-commit pip entries, and retained pre-existing pip transitive deps.
+- Must NOT compliance: no defaults channel, no new packages, no paraview_mcp/*.py changes.
+
+T3 — COMPLIANT
+- Owned file: pyproject.toml only.
+- Diff only adds [dependency-groups] dev with pre-commit==4.6.0, uv==0.11.18, and ruff.
+- Existing project metadata and script entry paraview-mcp = "paraview_mcp.main:main" preserved.
+- Must NOT compliance: no runtime deps moved into dev group; no [tool.uv] section added; no unrelated pyproject changes.
+
+T4 — COMPLIANT
+- Owned file: README.md only.
+- README is rewritten with the required 20 top-level sections: title/badges, Executive Summary, Table of Contents, What is MCP, Architecture, Prerequisites, Installation, Running, Integration: OpenCode, Integration: Claude Code, Integration: Claude Desktop, MCP Tool Reference, Maintenance, Troubleshooting / FAQ, Known Limitations, Contributing, Citation, Authors, License, Notice.
+- Includes mermaid diagram, BibTeX, NicholasSynovic clone URL, OpenCode/Claude integration snippets, tool reference, make freeze maintenance content, NOTICE link, and pvserver-sync limitation.
+- Stale-string evidence is empty; diff removed python pvserver, LLNL clone URL, underscore console script, and old server filename.
+- BSD-3-Clause license is accepted per calibrated criteria because it matches actual LICENSE/pyproject.
+- Must NOT compliance: no NOTICE edit, no CONTRIBUTING.md creation, no Docker/CI/multiplatform creep, no conda-lock mention.
+
+T5 — COMPLIANT
+- Owned file: AGENTS.md only.
+- Diff changes console-script invocations from paraview_mcp to paraview-mcp while preserving package/module/path/log references with underscore.
+- Direct read confirms python -m paraview_mcp.main, paraview_mcp/main.py, package import notes, and log filename remain underscore-form where appropriate.
+- Requirements.txt reference cleanup in AGENTS.md is accepted as in-scope cleanup aligned with T6 deletion.
+- Must NOT compliance: no package/module references incorrectly renamed; no other project file attributable to T5.
+
+T6 — COMPLIANT
+- Owned file: requirements.txt only.
+- git diff shows requirements.txt deleted.
+- Working tree check confirms requirements.txt is absent.
+- Must NOT compliance: no other deletion in project files.
+
+T7 — COMPLIANT
+- Owned file: Makefile only.
+- Direct read confirms .PHONY: build create-dev freeze, create-dev uses conda run -n paraview_mcp uv sync --group dev, freeze target exports conda env with grep -v "^prefix:" > environment.yaml, and freeze has the required @echo note about nodefaults and pip self-reference.
+- No conda-lock target or runtime paraview-mcp target added.
+- Note: older task-7 evidence/task-10 smoke output still shows uv sync without --group dev, but the actual Makefile has been fixed; this F4 run is based on the current diff and direct file read after the Makefile fix.
+- Must NOT compliance: build target preserved; Makefile recipe indentation remains tabbed.
+
+T8 — COMPLIANT
+- Scope: cross-file sweep/read-only verification except string-level fixes within existing task scopes.
+- Evidence .omo/evidence/task-8-sweep.txt contains ALL CLEAN.
+- No project source file changes attributed to T8; all project-file changes map to T2-T7 owners.
+- Must NOT compliance: no paraview_mcp/*.py, NOTICE, or .pre-commit-config.yaml changes.
+
+T9 — COMPLIANT
+- Scope: NOTICE verification only.
+- git diff HEAD -- NOTICE returned empty.
+- Evidence .omo/evidence/task-9-notice-sha256.txt shows matching working-tree and HEAD SHA-256 values.
+- Must NOT compliance: NOTICE unchanged; no NOTICE backup/sibling file appeared in changed project inventory.
+
+T10 — PARTIAL COMPLIANT / ACCEPTED
+- Scope: smoke test evidence only; no project source changes.
+- Evidence .omo/evidence/task-10-smoke.txt exists and records YAML parse OK, TOML parse OK, make dry-run, requirements.txt absent, and NOTICE unchanged.
+- Full conda env create/install/import/teardown evidence is not present; per calibrated criteria, this is noted but not counted as full non-compliance because static checks passed and the time constraint was documented.
+- Must NOT compliance: no pvserver run, no source-file mutation, no project-file changes attributable to T10.
+
+Cross-task contamination:
+- CLEAN. Each project-file change maps to its owner: environment.yaml -> T2; pyproject.toml -> T3; README.md -> T4; AGENTS.md -> T5; requirements.txt deletion -> T6; Makefile -> T7.
+- Accepted cross-reference cleanup: AGENTS.md removal of requirements.txt alternative install wording is part of T5/T6 consistency and is not contamination.
+- Read-only/QA tasks T1, T8, T9, and T10 created only .omo evidence/bookkeeping.
+
+Unaccounted changes:
+- CLEAN for project files. All non-.omo changed files are owned by T2-T7.
+- .omo/ changes are framework/evidence/bookkeeping and explicitly allowed.
+- No untracked project source/config files outside .omo were reported.
+
+Verdict:
+Tasks [10/10 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE

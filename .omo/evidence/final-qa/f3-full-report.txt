@@ -1,0 +1,156 @@
+F3 — Real Manual QA on README.md
+Date: 2026-06-03
+File: /home/nicholas/Documents/projects/paraview_mcp/README.md (285 lines, 20 sections)
+
+=============================================================================
+STEP 1: FILE OVERVIEW
+=============================================================================
+- 285 lines, 20 headings (including sub-headings)
+- ToC: 17 entries
+- Mermaid diagram: 1 (graph LR, 4 nodes, 3 edges)
+- JSON blocks: 3 (OpenCode config, Claude Code config, Claude Desktop config)
+- BibTeX block: 1 (NOT parsed as JSON, correctly excluded)
+- URLs: 8 unique
+
+=============================================================================
+STEP 2: TABLE OF CONTENTS LINK VALIDATION
+=============================================================================
+Algorithm: GitHub markdown anchor (lowercase, remove non-[a-z0-9 -], space→hyphen)
+
+ToC anchor → Heading match
+--------------------------
+VALID   #what-is-mcp            → "What is MCP?"
+VALID   #architecture           → "Architecture"
+VALID   #prerequisites          → "Prerequisites"
+VALID   #installation           → "Installation"
+VALID   #running                → "Running"
+VALID   #integration-opencode   → "Integration: OpenCode"
+VALID   #integration-claude-code → "Integration: Claude Code"
+VALID   #integration-claude-desktop → "Integration: Claude Desktop"
+VALID   #mcp-tool-reference     → "MCP Tool Reference"
+VALID   #maintenance            → "Maintenance"
+VALID   #troubleshooting--faq   → "Troubleshooting / FAQ"
+         (double-dash is CORRECT: "/ " → two spaces → two hyphens per GitHub algorithm)
+VALID   #known-limitations      → "Known Limitations"
+VALID   #contributing           → "Contributing"
+VALID   #citation               → "Citation"
+VALID   #authors                → "Authors"
+VALID   #license                → "License"
+VALID   #notice                 → "Notice"
+
+RESULT: 17/17 valid
+
+Note: In-document cross-reference [Running](#running) in Prerequisites section → VALID
+      In-document cross-reference [Known Limitations](#known-limitations) in Troubleshooting → VALID
+
+Referenced files: CONTRIBUTING.md → EXISTS ✓, LICENSE → EXISTS ✓, NOTICE → EXISTS ✓
+
+=============================================================================
+STEP 3: INSTALL / RUN STEP CONSISTENCY
+=============================================================================
+
+Installation sequence (lines 55-61):
+  1. git clone https://github.com/NicholasSynovic/paraview_mcp.git
+  2. cd paraview_mcp
+  3. conda env create -f environment.yaml -n paraview_mcp
+  4. conda activate paraview_mcp                ← BEFORE pip install ✓
+  5. pip install -e .                           ← after env activated ✓
+
+- conda activate called BEFORE pip install -e . ✓
+- No undefined env vars ✓
+- All steps in logical order ✓
+- paraview-mcp console script is registered by step 5 (pip install -e .) ✓
+
+Developer install (lines 65-71):
+  uv sync --group dev
+- Note: uv must be pre-installed; README doesn't explain how to get uv
+- Minor documentation gap (non-blocking): uv is not included in Installation
+  prerequisites, only mentioned in the dev section
+- The step itself is self-contained and correct ✓
+
+Running sequence (lines 73-99):
+  1. pvserver --multi-clients --server-port=11111  (separate terminal)
+  2. Connect ParaView GUI via File → Connect → localhost:11111
+  3. paraview-mcp --server localhost --port 11111
+
+- pvserver started BEFORE paraview-mcp ✓
+- Explicit "in order" instruction present ✓
+- No undefined env vars ✓
+- conda env activation implied from Installation (not repeated, but not ambiguous)
+- No forward references to unexplained steps ✓
+
+External ParaView install subsection:
+  paraview-mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
+- Uses placeholder path (python3.x) — appropriate as a template ✓
+
+RESULT: consistent
+Minor observation: Developer install doesn't document how to install uv (non-blocking)
+
+=============================================================================
+STEP 4: MERMAID DIAGRAM VALIDATION
+=============================================================================
+
+Block:
+  graph LR
+      A[LLM Client<br/>Claude / OpenCode] --> B[paraview-mcp<br/>MCP Server]
+      B --> C[pvserver<br/>ParaView Server]
+      C --> D[ParaView GUI]
+
+Checks:
+  PASS: Starts with 'graph LR' (valid directive)
+  PASS: Node A defined with label "LLM Client<br/>Claude / OpenCode"
+  PASS: Node B defined with label "paraview-mcp<br/>MCP Server"
+  PASS: Node C defined with label "pvserver<br/>ParaView Server"
+  PASS: Node D defined with label "ParaView GUI"
+  PASS: Edge A→B (inline definition + edge, valid mermaid)
+  PASS: Edge B→C
+  PASS: Edge C→D
+  PASS: <br/> HTML in labels valid for mermaid
+  PASS: "/" inside bracket labels is valid (no quoting needed inside [])
+  PASS: No unclosed brackets
+  PASS: All edge endpoints are defined nodes
+
+RESULT: VALID — graph LR, 4 nodes, 3 edges, all syntax correct
+
+=============================================================================
+STEP 5: URL TEST RESULTS
+=============================================================================
+
+Method: curl -I -L -s --max-time 10 -o /dev/null -w "%{http_code}"
+
+200 PASS  https://img.shields.io/badge/python-3.10%2B-blue
+200 PASS  https://www.python.org/
+200 PASS  https://img.shields.io/badge/License-BSD--3--Clause-green
+200 PASS  https://img.shields.io/badge/platform-linux--64-lightgrey
+200 PASS  https://anaconda.org/conda-forge/paraview
+200 PASS  https://modelcontextprotocol.io/
+200 PASS  https://github.com/NicholasSynovic/paraview_mcp.git
+200 PASS  https://github.com/NicholasSynovic
+
+RESULT: 8/8 URLs returned 2xx (all PASS)
+
+=============================================================================
+STEP 6: JSON BLOCK VALIDATION
+=============================================================================
+
+Block 1 — Integration: OpenCode (lines 105-114):
+  { "mcp": { "paraview": { "type": "local", "command": [...] } } }
+  VALID ✓
+
+Block 2 — Integration: Claude Code (lines 120-129):
+  { "mcpServers": { "paraview": { "command": "...", "args": [...] } } }
+  VALID ✓
+
+Block 3 — Integration: Claude Desktop (lines 135-144):
+  { "mcpServers": { "ParaView": { "command": "...", "args": [...] } } }
+  VALID ✓
+
+Note: BibTeX block (lines 262-271) correctly NOT parsed as JSON.
+
+RESULT: 3/3 JSON blocks valid
+
+=============================================================================
+FINAL VERDICT
+=============================================================================
+
+ToC [17/17 links valid] | Commands [consistent] | URLs [8/8 2xx] | JSON [3/3 valid] | Mermaid [VALID] | VERDICT: APPROVE

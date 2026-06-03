@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active_work_id": "makefile-create-dev-update-84d6d6b3",
+  "active_work_id": "reproducibility-and-readme-782da54c",
   "works": {
     "pyproject-toml-setup-2c4ae20f": {
       "work_id": "pyproject-toml-setup-2c4ae20f",
@@ -126,70 +126,171 @@
       },
       "ended_at": "2026-06-03T17:04:48.387Z",
       "elapsed_ms": 678217
+    },
+    "reproducibility-and-readme-782da54c": {
+      "work_id": "reproducibility-and-readme-782da54c",
+      "active_plan": "/home/nicholas/Documents/projects/paraview_mcp/.omo/plans/reproducibility-and-readme.md",
+      "plan_name": "reproducibility-and-readme",
+      "status": "completed",
+      "started_at": "2026-06-03T18:50:18.784Z",
+      "updated_at": "2026-06-03T19:38:35.763Z",
+      "session_ids": [
+        "opencode:ses_1720a19c3ffeWwtEugjao00S6B"
+      ],
+      "session_origins": {
+        "opencode:ses_1720a19c3ffeWwtEugjao00S6B": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "No stale console-script references (`paraview_mcp` underscore form used as a command)",
+          "session_id": "opencode:ses_171161dcfffeqtWOwkD6ZrZrzc",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "started_at": "2026-06-03T18:55:48.516Z",
+          "ended_at": "2026-06-03T19:17:24.229Z",
+          "elapsed_ms": 1295713,
+          "status": "completed",
+          "updated_at": "2026-06-03T19:17:24.229Z"
+        },
+        "todo:2": {
+          "task_key": "todo:2",
+          "task_label": "2",
+          "task_title": "Clean and rewrite `environment.yaml`",
+          "session_id": "opencode:ses_17125abe3ffeBuTg88p5J5PnNq",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-03T19:05:40.687Z",
+          "started_at": "2026-06-03T19:01:39.184Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T19:05:40.687Z",
+          "elapsed_ms": 241503
+        },
+        "todo:4": {
+          "task_key": "todo:4",
+          "task_label": "4",
+          "task_title": "Rewrite `README.md` with new structure",
+          "session_id": "opencode:ses_171177339ffei7FM35GNXU97xf",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "started_at": "2026-06-03T19:07:52.133Z",
+          "status": "completed",
+          "updated_at": "2026-06-03T19:15:18.422Z",
+          "ended_at": "2026-06-03T19:15:18.422Z",
+          "elapsed_ms": 446289
+        },
+        "todo:8": {
+          "task_key": "todo:8",
+          "task_label": "8",
+          "task_title": "Cross-file consistency sweep (script name, repo URL, stale commands)",
+          "session_id": "opencode:ses_17115e0c4ffeI2rNQt6ejUAFt1",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-06-03T19:17:35.797Z",
+          "started_at": "2026-06-03T19:16:55.214Z",
+          "status": "completed",
+          "ended_at": "2026-06-03T19:17:35.797Z",
+          "elapsed_ms": 40583
+        },
+        "final-wave:f1": {
+          "task_key": "final-wave:f1",
+          "task_label": "F1",
+          "task_title": "**Plan Compliance Audit** - `oracle`",
+          "session_id": "opencode:ses_17105b110ffezwd11a1MbTGi54",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "started_at": "2026-06-03T19:20:21.408Z",
+          "status": "completed",
+          "updated_at": "2026-06-03T19:38:35.763Z",
+          "ended_at": "2026-06-03T19:38:35.762Z",
+          "elapsed_ms": 1094354
+        }
+      },
+      "ended_at": "2026-06-03T19:38:24.736Z",
+      "elapsed_ms": 2885952
     }
   },
-  "active_plan": "/home/nicholas/Documents/projects/paraview_mcp/.omo/plans/makefile-create-dev-update.md",
-  "started_at": "2026-06-03T16:53:30.170Z",
+  "active_plan": "/home/nicholas/Documents/projects/paraview_mcp/.omo/plans/reproducibility-and-readme.md",
+  "started_at": "2026-06-03T18:50:18.784Z",
   "status": "completed",
-  "updated_at": "2026-06-03T17:04:48.387Z",
+  "updated_at": "2026-06-03T19:38:35.763Z",
   "session_ids": [
-    "opencode:ses_1720a19c3ffeWwtEugjao00S6B",
-    "opencode:ses_17192c085ffesnLlb75aM0wV81",
-    "opencode:ses_171929466ffe54Jn7VJrOM6igu",
-    "opencode:ses_17192523dffeXrTGlDv3rjXX69",
-    "opencode:ses_1719222c0ffeyI9PuORTmkuG94",
-    "opencode:ses_171902de7ffeunAKpW0bdSba1Q"
+    "opencode:ses_1720a19c3ffeWwtEugjao00S6B"
   ],
   "session_origins": {
-    "opencode:ses_1720a19c3ffeWwtEugjao00S6B": "direct",
-    "opencode:ses_17192c085ffesnLlb75aM0wV81": "appended",
-    "opencode:ses_171929466ffe54Jn7VJrOM6igu": "appended",
-    "opencode:ses_17192523dffeXrTGlDv3rjXX69": "appended",
-    "opencode:ses_1719222c0ffeyI9PuORTmkuG94": "appended",
-    "opencode:ses_171902de7ffeunAKpW0bdSba1Q": "appended"
+    "opencode:ses_1720a19c3ffeWwtEugjao00S6B": "direct"
   },
-  "plan_name": "makefile-create-dev-update",
+  "plan_name": "reproducibility-and-readme",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Add `.PHONY: build create-dev` as the very first line, followed by one blank line",
-      "session_id": "opencode:ses_171978b0dffesGdFATWBIbUf62",
+      "task_title": "No stale console-script references (`paraview_mcp` underscore form used as a command)",
+      "session_id": "opencode:ses_171161dcfffeqtWOwkD6ZrZrzc",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-03T16:56:20.875Z",
-      "started_at": "2026-06-03T16:56:02.979Z",
+      "started_at": "2026-06-03T18:55:48.516Z",
+      "ended_at": "2026-06-03T19:17:24.229Z",
+      "elapsed_ms": 1295713,
       "status": "completed",
-      "ended_at": "2026-06-03T16:56:20.875Z",
-      "elapsed_ms": 17896
+      "updated_at": "2026-06-03T19:17:24.229Z"
     },
     "todo:2": {
       "task_key": "todo:2",
       "task_label": "2",
-      "task_title": "Verify Makefile correctness with grep + diff checks",
-      "session_id": "opencode:ses_171955c80ffeBIWvlrSbr7yKWQ",
+      "task_title": "Clean and rewrite `environment.yaml`",
+      "session_id": "opencode:ses_17125abe3ffeBuTg88p5J5PnNq",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-03T19:05:40.687Z",
+      "started_at": "2026-06-03T19:01:39.184Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T19:05:40.687Z",
+      "elapsed_ms": 241503
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Rewrite `README.md` with new structure",
+      "session_id": "opencode:ses_171177339ffei7FM35GNXU97xf",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-03T16:59:20.668Z",
-      "started_at": "2026-06-03T16:59:00.469Z",
+      "started_at": "2026-06-03T19:07:52.133Z",
       "status": "completed",
-      "ended_at": "2026-06-03T16:59:20.668Z",
-      "elapsed_ms": 20199
+      "updated_at": "2026-06-03T19:15:18.422Z",
+      "ended_at": "2026-06-03T19:15:18.422Z",
+      "elapsed_ms": 446289
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Cross-file consistency sweep (script name, repo URL, stale commands)",
+      "session_id": "opencode:ses_17115e0c4ffeI2rNQt6ejUAFt1",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-03T19:17:35.797Z",
+      "started_at": "2026-06-03T19:16:55.214Z",
+      "status": "completed",
+      "ended_at": "2026-06-03T19:17:35.797Z",
+      "elapsed_ms": 40583
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "opencode:ses_171902de7ffeunAKpW0bdSba1Q",
-      "agent": "oracle",
-      "started_at": "2026-06-03T17:00:30.274Z",
+      "task_title": "**Plan Compliance Audit** - `oracle`",
+      "session_id": "opencode:ses_17105b110ffezwd11a1MbTGi54",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "started_at": "2026-06-03T19:20:21.408Z",
       "status": "completed",
-      "updated_at": "2026-06-03T17:03:38.407Z",
-      "ended_at": "2026-06-03T17:03:38.407Z",
-      "elapsed_ms": 188133
+      "updated_at": "2026-06-03T19:38:35.763Z",
+      "ended_at": "2026-06-03T19:38:35.762Z",
+      "elapsed_ms": 1094354
     }
   },
   "agent": "atlas",
-  "ended_at": "2026-06-03T17:04:48.387Z",
-  "elapsed_ms": 678217
+  "ended_at": "2026-06-03T19:38:24.736Z",
+  "elapsed_ms": 2885952
 }

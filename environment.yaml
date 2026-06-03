@@ -1,7 +1,7 @@
 name: paraview_mcp
 channels:
-  - defaults
   - conda-forge
+  - nodefaults
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=52_gnu
@@ -172,10 +172,7 @@ dependencies:
       - identify==2.6.19
       - nodeenv==1.10.0
       - platformdirs==4.10.0
-      - pre-commit==4.6.0
       - python-discovery==1.4.0
       - pyyaml==6.0.3
       - typing-extensions==4.15.0
-      - uv==0.11.18
       - virtualenv==21.4.2
-prefix: /home/nicholas/.local/bin/miniconda/envs/paraview_mcp

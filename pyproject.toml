@@ -43,3 +43,11 @@ packages = ["paraview_mcp"]
 
 [tool.black]
 line-length = 80
+
+
+[dependency-groups]
+dev = [
+    "pre-commit==4.6.0",
+    "uv==0.11.18",
+    "ruff",
+]

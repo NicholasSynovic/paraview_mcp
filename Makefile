@@ -1,4 +1,4 @@
-.PHONY: build create-dev
+.PHONY: build create-dev freeze
 
 build:
 	rm -rf dist
@@ -10,4 +10,8 @@ create-dev:
 	conda env update --file environment.yaml --prune
 	conda run -n paraview_mcp pre-commit install
 	rm -rf .venv
-	conda run -n paraview_mcp uv sync
+	conda run -n paraview_mcp uv sync --group dev
+
+freeze:
+	conda env export -n paraview_mcp | grep -v "^prefix:" > environment.yaml
+	@echo "NOTE: After freeze, manually verify channels include 'nodefaults' and pip section does not contain 'paraview-mcp'."

@@ -1,0 +1,13 @@
+7:- `paraview_mcp/main.py` — FastMCP entrypoint. Defines every `@mcp.tool()` and instantiates one module-level `ParaViewManager`. The `default_prompt` string in this file is a **behavioral contract sent to the LLM** ("one function per reply", color-map tips, etc.). Editing tool docstrings/wording changes model behavior.
+8:- `paraview_mcp/paraview_manager.py` (~1500 lines) — single class wrapping `paraview.simple`. All ParaView state lives here; `main.py` is a thin tool shim.
+9:- `paraview_mcp/__init__.py` — empty. The package uses absolute imports; run `pip install -e .` before importing.
+22:- Logs are written to `~/paraview_logs/paraview_mcp_external.log` (created on import of `main.py`). Don't expect logs in the repo.
+33:paraview-mcp --server localhost --port 11111
+35:paraview-mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
+38:The README says `python pvserver --multi-clients` and references a `paraview_mcp_server.py` file — both are stale. `pvserver` is a binary, and the canonical entrypoint is the `paraview-mcp` console script.
+42:`main.py` now uses `from paraview_mcp.paraview_manager import ParaViewManager` (absolute import). Consequences:
+44:- `python paraview_mcp/main.py` **no longer works standalone** — it requires `pip install -e .` first so `paraview_mcp` is on `sys.path`.
+45:- `python -m paraview_mcp.main` works after install.
+46:- The canonical invocation is the console script: `paraview-mcp --server localhost --port 11111`.
+56:This registers the `paraview-mcp` console script. `requirements.txt` is kept as an alternative install path (deps only, no entry point).
+81:- Active branch is `dev`. Two remotes: `origin` (fork: `NicholasSynovic/paraview_mcp`), `upstream` (`llnl/paraview_mcp`).

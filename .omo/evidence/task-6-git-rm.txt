@@ -1,0 +1,2 @@
+rm 'requirements.txt'
+D  requirements.txt

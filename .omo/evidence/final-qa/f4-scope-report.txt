@@ -1,0 +1,122 @@
+F4 Scope Fidelity Check — reproducibility-and-readme
+
+Inputs read:
+- .omo/plans/reproducibility-and-readme.md full task specs for T1-T10.
+- git diff --stat HEAD:
+  .omo/boulder.json | 173 +++++++++----
+  .omo/run-continuation/ses_1720a19c3ffeWwtEugjao00S6B.json | 6 +-
+  AGENTS.md | 14 +-
+  Makefile | 5 +-
+  README.md | 273 ++++++++++++++++++---
+  environment.yaml | 5 +-
+  pyproject.toml | 8 +
+  requirements.txt | 2 -
+- git status --short showed tracked project changes above plus untracked .omo/evidence/*, .omo/notepads/*, .omo/plans/reproducibility-and-readme.md, and one .omo/run-continuation/* file. These are framework/evidence files, not project source.
+- Actual diffs read for environment.yaml, pyproject.toml, README.md, AGENTS.md, requirements.txt, Makefile, NOTICE, and paraview_mcp/.
+
+Changed project files attributable to tasks:
+- environment.yaml -> T2
+- pyproject.toml -> T3
+- README.md -> T4
+- AGENTS.md -> T5
+- requirements.txt -> T6
+- Makefile -> T7
+
+Framework/bookkeeping changes excluded from project-source accounting:
+- .omo/boulder.json
+- .omo/run-continuation/ses_1720a19c3ffeWwtEugjao00S6B.json
+- untracked .omo/evidence/*
+- untracked .omo/notepads/reproducibility-and-readme/*
+- untracked .omo/plans/reproducibility-and-readme.md
+- untracked .omo/run-continuation/ses_1714ec9f6ffeUxPwwZDFey50bo.json
+
+Protected files checked:
+- git diff HEAD -- NOTICE: empty
+- git diff HEAD -- paraview_mcp: empty
+- git diff --stat HEAD -- NOTICE .pre-commit-config.yaml LICENSE CONTRIBUTING.md paraview_mcp: empty
+
+Per-task findings:
+
+T1 — Verify conda-forge availability: COMPLIANT.
+- Spec: read-only conda search; save .omo/evidence/task-1-conda-search.txt and task-1-decision.txt; no project file changes.
+- Evidence observed: task-1-conda-search.txt contains conda-forge search results with paraview 5.13.3 and exact build py310h494b928_110_qt; task-1-decision.txt contains BRANCH_A:py310h494b928_110_qt.
+- Diff impact: no project source file attributable to T1. Only .omo evidence, allowed.
+- Must NOT compliance: no evidence in project diff of conda install/env create side effects; no defaults fallback in resulting environment.yaml; Branch C did not apply.
+
+T2 — environment.yaml cleanup: NON-COMPLIANT.
+- Spec: ONLY environment.yaml. Channels must become conda-forge + nodefaults; keep existing pinned conda deps/build hashes in same order; paraview pin follows T1 Branch A; pip sub-block should keep only runtime deps not in dev group, i.e. httpx==0.28.1 and mcp[cli]==1.9.4 if present; remove paraview-mcp self-reference, uv, pre-commit; remove prefix.
+- Diff observed: defaults removed, nodefaults added, pre-commit and uv removed from pip block, prefix removed, paraview exact build pin preserved.
+- Missing: environment.yaml still contains pip-only transitive/dev dependencies cfgv, distlib, filelock, identify, nodeenv, platformdirs, python-discovery, pyyaml, typing-extensions, virtualenv. The spec required the pip sub-block to keep only runtime deps not in dev group, naming httpx and mcp[cli] if present. In this actual file, httpx/mcp[cli] are not in the pip block either, so the pip block is left as unrelated tooling residue instead of the specified runtime-only contents.
+- No creep outside environment.yaml for this task.
+- Must NOT compliance: no defaults, no prefix, no paraview-mcp self-reference, no uv/pre-commit, no conda dep version/build hash changes detected apart from allowed channel edits. However the retained pip tooling deps are outside the requested cleanup.
+
+T3 — pyproject.toml dev group: COMPLIANT.
+- Spec: ONLY pyproject.toml. Add [dependency-groups] dev = [pre-commit==4.6.0, uv==0.11.18, ruff]. Preserve existing fields/order and script entry; no [tool.uv] unless required.
+- Diff observed: purely additive [dependency-groups] table at end with exactly those three entries. Existing paraview-mcp = "paraview_mcp.main:main" remains unchanged.
+- Must NOT compliance: no key removal/rename, no runtime deps added to dev group, no [tool.uv].
+
+T4 — README rewrite: NON-COMPLIANT.
+- Spec: ONLY README.md. Full rewrite with required 20-section structure, shields.io badges for Python supported by paraview conda package, License Apache-2.0, MCP protocol; MCP intro; architecture diagram; install/run; OpenCode/Claude Code/Claude Desktop integrations; hand-list every @mcp.tool() from paraview_mcp/main.py with one-line descriptions; maintenance with make freeze; troubleshooting; known limitations; contributing; citation; authors; license; notice. Forbidden stale strings absent.
+- Diff observed: README was rewritten and includes H1, badges, executive summary, ToC, MCP intro, mermaid diagram, prerequisites, installation, running, OpenCode/Claude Code/Desktop snippets, tool reference, maintenance, troubleshooting, known limitations, contributing, citation, authors, license, notice.
+- Missing/incorrect vs spec:
+  1. Badge/license mismatch: spec explicitly requested License Apache-2.0 badge, but README uses BSD-3-Clause. (This may match LICENSE, but it is not 1:1 with the plan spec.)
+  2. MCP protocol badge missing; badges are Python, License, Platform.
+  3. Tool reference omits actual @mcp.tool() function get_active_source_names_by_type? No, included. It does include active tool names but the descriptions are paraphrased, not docstring summaries verbatim as required by plan references; this is a minor spec drift.
+  4. Tool reference includes compute_surface_area and plot_over_line, but list_commands in main.py exposes "plot_line" string while active tool is plot_over_line. README chose active function name, acceptable for @mcp.tool source; no issue.
+  5. License section says BSD-3-Clause instead of plan-requested Apache-2.0. Again, likely legally correct for current repo, but not 1:1 with T4 spec.
+- Forbidden stale strings in README diff: python pvserver removed, LLNL clone URL removed, old paraview_mcp console command removed, paraview_mcp_server.py removed, conda-lock absent.
+- Scope: README only for this task.
+
+T5 — AGENTS.md hyphenation: NON-COMPLIANT.
+- Spec: ONLY AGENTS.md. Replace console-script occurrences with paraview-mcp while preserving package/module/path/log references. Must NOT add or remove sections; target was surgical console-script replacements.
+- Diff observed: console-script invocations changed to paraview-mcp and module/path/log references preserved.
+- Scope creep within AGENTS.md: removed "Single requirements.txt kept as an alternative install path", changed environment note from "pip install -r requirements.txt alone" to "pip install -e . alone", rewrote stale README guidance sentence, removed "requirements.txt is kept as an alternative install path" sentence. These are README/dependency cleanup aligned globally, but T5's task-specific scope said only console-script hyphenation and explicitly "Do NOT add or remove sections" / no other edits. This is intra-file creep for T5.
+- Must NOT compliance: no other file touched by T5; no package/module references incorrectly hyphenated.
+
+T6 — Delete requirements.txt: COMPLIANT.
+- Spec: ONLY requirements.txt deleted; no commit; do not delete anything else.
+- Diff observed: requirements.txt deleted. HEAD content was two lines (httpx, mcp[cli]==1.9.4), not the four-line content assumed by the plan, but deletion itself matches task scope. git status shows D requirements.txt.
+- Must NOT compliance: no other project file deletion.
+
+T7 — Makefile freeze target/update create-dev: NON-COMPLIANT.
+- Spec: ONLY Makefile. Remove pip install -r requirements.txt from create-dev and add uv sync --group dev or uv pip install --group dev in its place; keep conda env update and pre-commit install; add freeze target with conda env export pipe and an echo reminder; add freeze to .PHONY; do not remove build; no lock target; tabs preserved.
+- Diff observed: .PHONY gained freeze; freeze target added with conda env export -n paraview_mcp | grep -v "^prefix:" > environment.yaml. Build/create-dev existing targets preserved. There was no pip install -r requirements.txt line in HEAD Makefile, so none removed.
+- Missing:
+  1. create-dev still runs `conda run -n paraview_mcp uv sync` without `--group dev`; spec required `uv sync --group dev` or `uv pip install --group dev`.
+  2. freeze target lacks the required @echo note: "NOTE: After freeze, manually verify channels include 'nodefaults' and pip section does not contain 'paraview-mcp'."
+- Must NOT compliance: no conda-lock/lock target, build target preserved, TAB indentation present, no new runtime paraview-mcp target.
+
+T8 — Cross-file consistency sweep: COMPLIANT.
+- Spec: read-only verification unless string inconsistencies require surgical fixes within existing task scopes; no architectural changes; do not touch paraview_mcp/*.py, NOTICE, .pre-commit-config.yaml.
+- Evidence observed: .omo/evidence/task-8-sweep.txt says ALL CLEAN. Project diffs show no separate files beyond T2-T7 owned files and allowed .omo evidence.
+- Must NOT compliance: protected files unchanged; no Python source changes.
+
+T9 — NOTICE byte-identity verification: COMPLIANT.
+- Spec: read-only verification; NOTICE unchanged, no backups.
+- Diff observed: git diff HEAD -- NOTICE empty. Protected-file stat check empty.
+- Evidence observed: .omo/evidence/task-9-notice-sha256.txt exists. No NOTICE project diff.
+- Must NOT compliance: NOTICE not modified/deleted/inlined as a file; no NOTICE.bak/orig/tmp tracked or shown in status.
+
+T10 — Full conda env install + smoke test: NON-COMPLIANT for spec completion, but no scope contamination.
+- Spec: create unique conda QA env, conda env create, pip install -e, which paraview-mcp, import paraview.simple, import paraview_mcp.main, uv sync --group dev or uv pip install --group dev fallback, which pre-commit/uv, mandatory teardown, create .omo/evidence/task-10-*.txt/log only; do not modify source files.
+- Evidence observed: only .omo/evidence/task-10-smoke.txt, containing static YAML/TOML parse, make -n create-dev, requirements absence, NOTICE diff. No unique env-name, env-create log, pip-install log, which paraview-mcp, import checks, uv-form, pre-commit/uv which, teardown log, or env-list-after evidence files were present in the status/read evidence list.
+- Missing: the heavyweight conda env install and teardown workflow specified by T10 was not performed in the actual evidence available.
+- Scope: no project source file changes attributable to T10, which is compliant with T10 file-scope restrictions.
+
+Cross-task contamination:
+- No evidence that a task modified another task's owned file in git diff: environment.yaml, pyproject.toml, README.md, AGENTS.md, requirements.txt, and Makefile are the only changed project files and each has a named owning task.
+- Read-only tasks T1, T8, T9, T10 did not introduce project source diffs.
+- However, intra-task scope creep exists in AGENTS.md (T5) and missing/incorrect Makefile/environment/README/T10 work exists as noted above. These are task non-compliances, not cross-file contamination.
+
+Unaccounted changes:
+- Project source/config files: none. Every tracked non-.omo changed project file is claimed by T2-T7.
+- .omo/* changes and untracked .omo/* evidence/plans/notepads/run-continuation files are framework/evidence/bookkeeping and explicitly acceptable.
+
+Verdict rationale:
+- Compliant tasks: T1, T3, T6, T8, T9 = 5/10.
+- Non-compliant tasks: T2, T4, T5, T7, T10 = 5/10.
+- Contamination: CLEAN (0 cross-task contamination issues).
+- Unaccounted: CLEAN (0 unaccounted project files).
+- Overall verdict: REJECT because not all tasks are spec-compliant.
+
+Tasks [5/10 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: REJECT

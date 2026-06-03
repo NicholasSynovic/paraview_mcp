@@ -1,0 +1,50 @@
+CLEAN
+
+F2 Code/Config Quality Review — 2026-06-03
+==========================================
+
+AUTOMATED CHECKS
+----------------
+YAML parse (environment.yaml)    : PASS
+TOML parse (pyproject.toml)      : PASS
+Makefile dry-run create-dev      : PASS
+Makefile dry-run freeze          : PASS
+Trailing whitespace (all files)  : PASS — none found
+Placeholder text (TODO/FIXME/XXX): PASS — none found
+
+MANUAL REVIEW
+-------------
+README.md:
+  - AI slop markers: NONE found (blazing fast, revolutionary, seamlessly, robust and scalable, game-changing, leverage, synergy checked)
+  - Emoji count: 0 (PASS)
+  - No tautological descriptions detected
+  - All CLI invocations use paraview-mcp (hyphen) form
+  RESULT: CLEAN
+
+AGENTS.md:
+  - CLI invocations: all use `paraview-mcp` hyphen form (lines 33, 35, 46, 56)
+  - Underscore refs (`paraview_mcp/...`) are Python module path references — correct
+  - No stale `requirements.txt` references
+  - No `python pvserver` (stale) usage — uses `pvserver` binary directly (line 28)
+  RESULT: CLEAN
+
+Makefile:
+  - Recipe indentation: TABS confirmed (all 3 recipes)
+  - .PHONY covers all targets: build, create-dev, freeze — COMPLETE
+  - No references to requirements.txt
+  RESULT: CLEAN
+
+pyproject.toml:
+  - [dependency-groups] dev: pre-commit==4.6.0 ✓, uv==0.11.18 ✓, ruff ✓
+  - Console script: paraview-mcp = "paraview_mcp.main:main" ✓ (hyphen form)
+  - No `paraview` in [project.dependencies] ✓
+  RESULT: CLEAN
+
+environment.yaml:
+  - channels: [conda-forge, nodefaults] — correct order ✓
+  - No prefix: line ✓
+  - paraview=5.13.3=py310h494b928_110_qt pin present at line 117 ✓
+  - pip section: no pre-commit or uv (pip deps are pre-commit transitive deps only: cfgv, nodeenv, virtualenv, etc.) ✓
+  RESULT: CLEAN
+
+VERDICT: ALL 5 FILES CLEAN — NO ISSUES FOUND

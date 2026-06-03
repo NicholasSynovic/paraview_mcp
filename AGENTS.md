@@ -8,11 +8,11 @@ ParaView MCP server: a FastMCP server that exposes `paraview.simple` operations 
 - `paraview_mcp/paraview_manager.py` (~1500 lines) — single class wrapping `paraview.simple`. All ParaView state lives here; `main.py` is a thin tool shim.
 - `paraview_mcp/__init__.py` — empty. The package uses absolute imports; run `pip install -e .` before importing.
 
-No tests, no CI. Single `requirements.txt` kept as an alternative install path.
+No tests, no CI.
 
 ## Environment & quirks
 
-- `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed. `pip install -r requirements.txt` alone gives you `mcp` + `httpx` but the server will fail to import on startup.
+- `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed. `pip install -e .` alone gives you `mcp` + `httpx` but the server will fail to import on startup.
 - Python version signals disagree — trust the runtime constraint, not the files:
   - `.python-version` → `3.14`
   - `.pre-commit-config.yaml` → `python3.13`
@@ -30,12 +30,12 @@ pvserver --multi-clients --server-port=11111
 # 2. start ParaView GUI and File → Connect to that pvserver
 
 # 3. start the MCP server (requires pip install -e . first)
-paraview_mcp --server localhost --port 11111
+paraview-mcp --server localhost --port 11111
 # or with an external ParaView install:
-paraview_mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
+paraview-mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
 ```
 
-The README says `python pvserver --multi-clients` and references a `paraview_mcp_server.py` file — both are stale. `pvserver` is a binary, and the canonical entrypoint is the `paraview_mcp` console script.
+The README uses `pvserver --multi-clients --server-port=11111` (correct — `pvserver` is a binary, not a Python script) and the `paraview-mcp` console script (hyphen form) as the canonical entrypoint.
 
 ### Running notes
 
@@ -43,7 +43,7 @@ The README says `python pvserver --multi-clients` and references a `paraview_mcp
 
 - `python paraview_mcp/main.py` **no longer works standalone** — it requires `pip install -e .` first so `paraview_mcp` is on `sys.path`.
 - `python -m paraview_mcp.main` works after install.
-- The canonical invocation is the console script: `paraview_mcp --server localhost --port 11111`.
+- The canonical invocation is the console script: `paraview-mcp --server localhost --port 11111`.
 
 ## Build / dev tooling
 
@@ -53,7 +53,7 @@ The README says `python pvserver --multi-clients` and references a `paraview_mcp
 pip install -e .
 ```
 
-This registers the `paraview_mcp` console script. `requirements.txt` is kept as an alternative install path (deps only, no entry point).
+This registers the `paraview-mcp` console script.
 
 ## Lint / format / hooks
 
