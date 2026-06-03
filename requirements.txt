@@ -1,2 +1,2 @@
 httpx
-mcp[cli]
+mcp[cli]==1.9.4
