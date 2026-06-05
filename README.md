@@ -119,6 +119,12 @@ Add the following to `~/.config/opencode/opencode.json`:
 }
 ```
 
+Or use the provided config like so:
+
+```bash
+OPENCODE_CONFIG=opencode-config.json opencode
+```
+
 ## Integration: Claude Code
 
 Add the following to `.mcp.json` in your project root (or `~/.claude/mcp.json` for a global config):

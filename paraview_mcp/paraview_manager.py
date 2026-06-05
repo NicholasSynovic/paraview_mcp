@@ -17,14 +17,37 @@ class ParaViewManager:
     a clean interface for the MCP server.
     """
 
-    def __init__(self):
-        """Initialize the ParaView manager"""
+    def __init__(
+        self,
+        compress_screenshots=True,
+        max_screenshot_width=1280,
+        screenshot_quality=85,
+    ):
+        """
+        Initialize the ParaView manager
+
+        Args:
+            compress_screenshots (bool): Whether to compress screenshots to reduce token usage.
+                                        Default: True (recommended for API usage)
+            max_screenshot_width (int): Maximum width for screenshots when compression is enabled.
+                                       Height is scaled proportionally. Default: 1280
+            screenshot_quality (int): JPEG quality (1-100) when compression is enabled.
+                                    Default: 85 (good quality with significant size reduction)
+        """
         self.connection = None
         self.logger = logging.getLogger("paraview_manager")
         # This will always hold the originally loaded data source,
         # which is needed for operations like volume rendering.
         self.original_source = None
         self._data_folder = ""
+
+        # Screenshot compression settings
+        self.compress_screenshots = compress_screenshots
+        self.max_screenshot_width = max_screenshot_width
+        self.screenshot_quality = screenshot_quality
+        self.logger.info(
+            f"ParaViewManager initialized with screenshot compression: {compress_screenshots}"
+        )
 
     def _get_source_name(self, proxy):
         """
@@ -94,7 +117,7 @@ class ParaViewManager:
         Load data from a file into ParaView
 
         Args:
-            file_path: Path to the data file
+            file_path: Path to the data file (can be relative or absolute)
 
         Returns:
             tuple: (success, message, reader, source_name)
@@ -103,6 +126,43 @@ class ParaViewManager:
             import os
 
             from paraview.simple import GetActiveView, OpenDataFile, Show
+
+            # Handle relative paths by checking multiple possible base directories
+            original_path = file_path
+
+            # Convert to absolute path if it's relative
+            if not os.path.isabs(file_path):
+                # Try different base directories for relative paths
+                possible_bases = [
+                    os.getcwd(),  # Current working directory
+                    os.path.dirname(
+                        os.path.dirname(__file__)
+                    ),  # Project root (parent of src/)
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(__file__)), "eval"
+                    ),  # eval directory
+                ]
+
+                for base_dir in possible_bases:
+                    test_path = os.path.join(base_dir, file_path)
+                    if os.path.exists(test_path):
+                        file_path = test_path
+                        break
+                else:
+                    # If still not found, use absolute path of original
+                    file_path = os.path.abspath(original_path)
+
+            # Final check if file exists
+            if not os.path.exists(file_path):
+                self.logger.error(
+                    f"File not found: {file_path} (original: {original_path})"
+                )
+                return (
+                    False,
+                    f"File not found: {file_path} (tried from multiple locations)",
+                    None,
+                    "",
+                )
 
             # Record the directory of the loaded file so we can re-use it.
             self._data_folder = os.path.dirname(file_path)
@@ -124,9 +184,36 @@ class ParaViewManager:
 
             # Show in the active view
             view = GetActiveView()
+            if not view:
+                # Create a render view if none exists
+                from paraview.simple import CreateRenderView
+
+                view = CreateRenderView()
+                self.logger.info("Created new render view")
+
             display = Show(reader, view)
-            display.ScaleFactor = 0.5
-            view.ResetCamera(False)
+
+            # For RAW files, check if it's 3D and set appropriate representation
+            if file_extension == ".raw" and hasattr(reader, "DataExtent"):
+                extent = reader.DataExtent
+                # Check if this is 3D data (z dimension > 1)
+                if extent and len(extent) >= 6 and extent[5] - extent[4] > 0:
+                    # Use Outline representation to avoid slice mapper issues
+                    display.SetRepresentationType("Outline")
+                    self.logger.info("Set representation to Outline for 3D RAW data")
+            # else:
+            # display.ScaleFactor = 0.5
+
+            view.ResetCamera()  # Allow full camera reset including clipping range
+
+            # Add some padding by zooming out slightly for better framing
+            cam = view.GetActiveCamera()
+            if cam:
+                cam.Dolly(0.7)  # Zoom out by 30% for better initial view
+                from paraview.simple import Render
+
+                Render()  # Update the view after camera adjustment
+
             # Save the loaded reader as the original data source
             self.original_source = reader
 
@@ -140,71 +227,432 @@ class ParaViewManager:
                 source_name,
             )
         except Exception as e:
-            self.logger.error(f"Error loading data: {str(e)}")
-            return False, f"Error loading data: {str(e)}", None, ""
+            self.logger.error(f"Error loading data: {str(e)} file path{file_path}")
+            return False, f"Error loading data: {str(e)} file path{file_path}", None, ""
 
-    def _configure_raw_reader(self, file_path, file_name):
+    def _configure_raw_reader(
+        self,
+        file_path,
+        file_name,
+        dimensions=None,
+        data_type=None,
+        byte_order=None,
+        num_components=None,
+    ):
         """
         Configure a reader for RAW volume files
 
         Args:
             file_path: Path to the RAW file
             file_name: Name of the file
+            dimensions: Optional tuple of (x, y, z) dimensions
+            data_type: Optional data type string (uint8, uint16, float32, etc.)
+            byte_order: Optional byte order ('LittleEndian' or 'BigEndian')
+            num_components: Optional number of scalar components
 
         Returns:
             reader: Configured reader object
         """
         from paraview.simple import OpenDataFile
 
-        # Try to parse dimensions and data type from filename
-        # Expected format: name_XxYxZ_datatype.raw (e.g., foot_256x256x256_uint8.raw)
-        dimensions_match = re.search(r"(\d+)x(\d+)x(\d+)", file_name)
-        datatype_match = re.search(
-            r"_(uint8|uint16|int8|int16|float32|float64)", file_name.lower()
-        )
+        # If parameters not provided, try to parse from filename
+        if dimensions is None or data_type is None:
+            # Try to parse dimensions and data type from filename
+            # Expected format: name_XxYxZ_datatype.raw (e.g., foot_256x256x256_uint8.raw)
+            dimensions_match = re.search(r"(\d+)x(\d+)x(\d+)", file_name)
+            datatype_match = re.search(
+                r"_(uint8|uint16|int8|int16|float32|float64)", file_name.lower()
+            )
+            scalar_components_match = re.search(r"_scalar(\d+)", file_name.lower())
+
+            if dimensions is None and dimensions_match:
+                dimensions = (
+                    int(dimensions_match.group(1)),
+                    int(dimensions_match.group(2)),
+                    int(dimensions_match.group(3)),
+                )
+
+            if data_type is None and datatype_match:
+                data_type = datatype_match.group(1)
+
+            if num_components is None and scalar_components_match:
+                num_components = int(scalar_components_match.group(1))
 
         # Load the raw file
         reader = OpenDataFile(file_path)
         if not reader:
             return None
 
-        # Set reader properties based on filename
-        if dimensions_match:
-            dim_x = int(dimensions_match.group(1))
-            dim_y = int(dimensions_match.group(2))
-            dim_z = int(dimensions_match.group(3))
+        # Set reader properties
+        if dimensions:
+            dim_x, dim_y, dim_z = [int(d) for d in dimensions]
             reader.DataExtent = [0, dim_x - 1, 0, dim_y - 1, 0, dim_z - 1]
             reader.FileDimensionality = 3
-            self.logger.info(f"Detected dimensions: {dim_x}x{dim_y}x{dim_z}")
+            self.logger.info(f"Set dimensions: {dim_x}x{dim_y}x{dim_z}")
 
-        if datatype_match:
-            datatype = datatype_match.group(1)
-            # Map to ParaView data types
-            datatype_map = {
-                "uint8": "unsigned char",
-                "uint16": "unsigned short",
-                "int8": "char",
-                "int16": "short",
-                "float32": "float",
-                "float64": "double",
-            }
-            if datatype in datatype_map:
-                reader.DataScalarType = datatype_map[datatype]
-                self.logger.info(f"Detected data type: {datatype_map[datatype]}")
+        # Map to ParaView data types
+        datatype_map = {
+            "uint8": "unsigned char",
+            "uint16": "unsigned short",
+            "int8": "char",
+            "int16": "short",
+            "float32": "float",
+            "float64": "double",
+        }
+
+        if data_type and data_type in datatype_map:
+            reader.DataScalarType = datatype_map[data_type]
+            self.logger.info(f"Set data type: {datatype_map[data_type]}")
         else:
             # Default to unsigned char if not specified
             reader.DataScalarType = "unsigned char"
 
-        # Set other common properties for raw files
-        reader.DataByteOrder = "LittleEndian"  # Default to LittleEndian
-        reader.NumberOfScalarComponents = 1  # Default to single component
+        # Set byte order
+        if byte_order:
+            reader.DataByteOrder = byte_order
+        else:
+            reader.DataByteOrder = "LittleEndian"  # Default to LittleEndian
+
+        # Set number of scalar components
+        if num_components:
+            reader.NumberOfScalarComponents = num_components
+            self.logger.info(f"Set scalar components: {num_components}")
+        else:
+            reader.NumberOfScalarComponents = 1  # Default to single component
 
         self.logger.info(
             f"Configured RAW reader with: ScalarType={reader.DataScalarType}, "
-            + f"ByteOrder={reader.DataByteOrder}, Extent={reader.DataExtent}"
+            + f"ByteOrder={reader.DataByteOrder}, Extent={reader.DataExtent}, "
+            + f"NumberOfScalarComponents={reader.NumberOfScalarComponents}"
         )
 
         return reader
+
+    def load_raw_data(
+        self,
+        file_path,
+        dimensions,
+        data_type,
+        byte_order="LittleEndian",
+        spacing=(1, 1, 1),
+        num_components=1,
+    ):
+        """
+        Load RAW data from a file with explicit parameters
+
+        Args:
+            file_path: Path to the RAW data file
+            dimensions: Tuple of (x, y, z) dimensions
+            data_type: Data type string (uint8, uint16, int8, int16, float32, float64)
+            byte_order: Byte order ('LittleEndian' or 'BigEndian'), default: 'LittleEndian'
+            spacing: Data spacing tuple (sx, sy, sz), default: (1, 1, 1)
+            num_components: Number of scalar components, default: 1
+
+        Returns:
+            tuple: (success, message, reader, source_name)
+
+        Example:
+            # Load a 256x256x256 uint8 volume
+            success, msg, reader, name = manager.load_raw_data(
+                "data.raw",
+                dimensions=(256, 256, 256),
+                data_type='uint8'
+            )
+        """
+        try:
+            import os
+
+            from paraview.simple import GetActiveView, Show
+
+            # Handle relative paths
+            original_path = file_path
+
+            # Convert to absolute path if it's relative
+            if not os.path.isabs(file_path):
+                possible_bases = [
+                    os.getcwd(),
+                    os.path.dirname(os.path.dirname(__file__)),
+                    os.path.join(os.path.dirname(os.path.dirname(__file__)), "eval"),
+                    self._data_folder if self._data_folder else "",
+                ]
+
+                for base_dir in possible_bases:
+                    if base_dir:
+                        test_path = os.path.join(base_dir, file_path)
+                        if os.path.exists(test_path):
+                            file_path = test_path
+                            break
+                else:
+                    file_path = os.path.abspath(original_path)
+
+            # Check if file exists
+            if not os.path.exists(file_path):
+                self.logger.error(f"File not found: {file_path}")
+                return False, f"File not found: {file_path}", None, ""
+
+            # Record the directory
+            self._data_folder = os.path.dirname(file_path)
+            file_name = os.path.basename(file_path)
+
+            # Configure and load the RAW reader with explicit parameters
+            reader = self._configure_raw_reader(
+                file_path,
+                file_name,
+                dimensions=dimensions,
+                data_type=data_type,
+                byte_order=byte_order,
+                num_components=num_components,
+            )
+
+            if not reader:
+                return False, f"Failed to load RAW data from {file_path}", None, ""
+
+            # Set data spacing if provided
+            if hasattr(reader, "DataSpacing") and spacing != (1, 1, 1):
+                reader.DataSpacing = list(spacing)
+                self.logger.info(f"Set data spacing: {spacing}")
+
+            # Show in the active view
+            view = GetActiveView()
+            display = Show(reader, view)
+
+            # For 3D data, ensure we use volume or outline representation
+            # to avoid the image slice mapper error
+            if dimensions and len(dimensions) == 3:
+                dim_x, dim_y, dim_z = [int(d) for d in dimensions]
+                if dim_z > 1:  # This is 3D data
+                    # Use Outline representation to avoid slice mapper issues
+                    display.SetRepresentationType("Outline")
+                    self.logger.info("Set representation to Outline for 3D data")
+
+            view.ResetCamera()  # Allow full camera reset including clipping range
+
+            # Add some padding by zooming out slightly for better framing
+            cam = view.GetActiveCamera()
+            if cam:
+                cam.Dolly(0.7)  # Zoom out by 30% for better initial view
+                from paraview.simple import Render
+
+                Render()  # Update the view after camera adjustment
+
+            # Save as original source
+            self.original_source = reader
+
+            # Get the source name
+            source_name = self._get_source_name(reader)
+
+            # Convert dimensions to integers for display
+            int_dimensions = tuple(int(d) for d in dimensions)
+            self.logger.info(f"Successfully loaded RAW data from {file_path}")
+            return (
+                True,
+                f"Successfully loaded RAW data from {file_path} with dimensions {int_dimensions}",
+                reader,
+                source_name,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error loading RAW data: {str(e)}")
+            return False, f"Error loading RAW data: {str(e)}", None, ""
+
+    def clear_pipeline_and_reset(self):
+        """
+        Completely clear the ParaView pipeline and return the GUI to a clean,
+        freshly-started state.
+
+        Steps performed:
+        1.  Delete every source and filter currently in the pipeline.
+        2.  Wipe all cached handles in this `ParaViewManager` instance.
+        3.  Reset the active render view (camera, background, colormaps, etc.).
+        4.  Reset all visualization settings to defaults.
+        5.  Force a render so the UI immediately reflects the change.
+
+        Returns
+        -------
+        (success: bool, message: str)
+        """
+        try:
+            # Core ParaView helpers we need
+            from paraview.simple import (
+                Delete,
+                GetActiveView,
+                GetColorTransferFunction,
+                GetOpacityTransferFunction,
+                GetSources,
+                Render,
+                ResetCamera,
+            )
+
+            # --------------------------------------------------------
+            # 1.  Delete every pipeline object that exists
+            # --------------------------------------------------------
+            sources = GetSources()
+            num_sources = len(sources) if sources else 0
+
+            if sources:
+                # Collect proxies first, then delete – avoids iterator invalidation
+                proxies_to_delete = [proxy for (_, proxy) in sources.items()]
+                for proxy in proxies_to_delete:
+                    try:
+                        Delete(proxy)
+                    except Exception as err:
+                        self.logger.warning(f"Could not delete proxy: {err}")
+
+            # --------------------------------------------------------
+            # 2.  Reset our own cached state
+            # --------------------------------------------------------
+            self.original_source = None
+            if hasattr(self, "isosurface_filter"):
+                self.isosurface_filter = None
+            self._data_folder = ""
+
+            # --------------------------------------------------------
+            # 3.  Reset colormaps and transfer functions
+            # --------------------------------------------------------
+            # Reset commonly used colormaps to default ranges
+            common_arrays = ["ImageFile", "MetaImage", "Scalars_", "RTData"]
+            for array_name in common_arrays:
+                try:
+                    # Reset color transfer function
+                    ctf = GetColorTransferFunction(array_name)
+                    if ctf:
+                        ctf.RescaleTransferFunction(
+                            0.0, 255.0
+                        )  # Default range for uint8
+                        # Reset to default colormap (e.g., Cool to Warm)
+                        ctf.ApplyPreset("Cool to Warm", True)
+
+                    # Reset opacity transfer function
+                    otf = GetOpacityTransferFunction(array_name)
+                    if otf:
+                        otf.Points = [
+                            0.0,
+                            0.0,
+                            0.5,
+                            0.0,
+                            255.0,
+                            1.0,
+                            0.5,
+                            0.0,
+                        ]  # Default linear
+                except:
+                    pass  # Ignore if the array doesn't exist
+
+            # --------------------------------------------------------
+            # 4.  Reset the active view & camera
+            # --------------------------------------------------------
+            view = GetActiveView()
+            if view:
+                # One call handles both camera framing *and* clipping range
+                ResetCamera(view)
+
+                # Set a neutral dark-grey background (solid, no gradient)
+                if hasattr(view, "Background"):
+                    view.Background = [0.32, 0.34, 0.43]
+                if hasattr(view, "Background2"):  # match Background -> no gradient
+                    view.Background2 = [0.32, 0.34, 0.43]
+
+                # Let ResetCamera handle the camera position based on data bounds
+                # Only set view up and ensure proper projection
+                # Check if view supports camera (3D render view) vs 2D plot views
+                cam = None
+                if hasattr(view, "GetActiveCamera"):
+                    cam = view.GetActiveCamera()
+                    if cam:
+                        # Keep Z-up orientation which is common for many datasets
+                        cam.SetViewUp(0.0, 0.0, 1.0)
+                        # Use the default view angle
+                        cam.SetViewAngle(30.0)
+
+                    # Center of rotation should match camera focal point for intuitive rotation
+                    if hasattr(view, "CenterOfRotation") and cam:
+                        view.CenterOfRotation = cam.GetFocalPoint()
+
+                # Ensure perspective projection
+                if hasattr(view, "CameraParallelProjection"):
+                    view.CameraParallelProjection = 0
+
+                # Reset any view-specific settings
+                # For ParaView 5.10+, use BackgroundColorMode instead of UseGradientBackground
+                if hasattr(view, "BackgroundColorMode"):
+                    view.BackgroundColorMode = (
+                        "Single Color"  # Use single color, not gradient
+                    )
+                elif hasattr(view, "UseGradientBackground"):
+                    # Fallback for older versions
+                    view.UseGradientBackground = 0
+
+                if hasattr(view, "OrientationAxesVisibility"):
+                    view.OrientationAxesVisibility = 1  # Show orientation axes
+
+            # --------------------------------------------------------
+            # 5.  Force a redraw so the GUI updates immediately
+            # --------------------------------------------------------
+            try:
+                if view:
+                    Render(view)
+            except Exception as err:
+                self.logger.warning(f"Render failed after reset: {err}")
+
+            msg = (
+                "Pipeline cleared successfully. "
+                f"Removed {num_sources} source(s), reset all view settings, "
+                "and reinitialized colormaps."
+            )
+            self.logger.info(msg)
+            return True, msg
+
+        except Exception as err:
+            error_msg = f"Error clearing pipeline: {err}"
+            self.logger.error(error_msg)
+            return False, error_msg
+
+    def set_background_color(self, red=0.32, green=0.34, blue=0.43):
+        """
+        Set the background color of the active view.
+
+        Args:
+            red (float): Red component (0.0 to 1.0). Default: 0.32
+            green (float): Green component (0.0 to 1.0). Default: 0.34
+            blue (float): Blue component (0.0 to 1.0). Default: 0.43
+
+        Note:
+            Default values approximate ParaView's default dark background.
+
+        Returns:
+            tuple: (success, message)
+        """
+        try:
+            from paraview.simple import GetActiveView, SetViewProperties
+
+            view = GetActiveView()
+            if not view:
+                return False, "Error: No active view."
+
+            # Validate color values
+            for value, name in [(red, "red"), (green, "green"), (blue, "blue")]:
+                if not 0.0 <= value <= 1.0:
+                    return (
+                        False,
+                        f"Error: {name} value must be between 0.0 and 1.0 (got {value})",
+                    )
+
+            # Set both Background and Background2 to the same color for solid color
+            SetViewProperties(
+                view,
+                Background=[red, green, blue],
+                Background2=[red, green, blue],  # Set same color to avoid gradient
+                UseColorPaletteForBackground=0,
+            )
+
+            return (
+                True,
+                f"Background color set to RGB({red:.2f}, {green:.2f}, {blue:.2f})",
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error setting background color: {str(e)}")
+            return False, f"Error setting background color: {str(e)}"
 
     def save_contour_as_stl(self, stl_filename="contour.stl"):
         """
@@ -227,22 +675,36 @@ class ParaViewManager:
             if not active_source:
                 return False, "Error: No active source to save.", ""
 
-            # Check that we have a recorded data folder
+            # Check that we have a recorded data folder, use current directory as fallback
             if not hasattr(self, "_data_folder") or not self._data_folder:
-                return (
-                    False,
-                    (
-                        "Error: No data folder known. "
-                        "Did you load data first before saving?"
-                    ),
-                    "",
+                self._data_folder = os.getcwd()
+                self.logger.info(
+                    f"No data folder set, using current directory: {self._data_folder}"
                 )
 
             # Compose the full path in the same folder as the loaded data
             full_path = os.path.join(self._data_folder, stl_filename)
 
+            # For STL export, we may need to extract surface or triangulate first
+            from paraview.simple import ExtractSurface, Triangulate
+
+            # Check if the data is already surface data
+            data_info = active_source.GetDataInformation()
+
+            # If it's volume data, extract surface first
+            if data_info.GetDataSetTypeAsString() in [
+                "vtkUnstructuredGrid",
+                "vtkStructuredGrid",
+                "vtkImageData",
+            ]:
+                surface = ExtractSurface(Input=active_source)
+                triangulated = Triangulate(Input=surface)
+            else:
+                # For polydata, just triangulate
+                triangulated = Triangulate(Input=active_source)
+
             # Save to STL
-            SaveData(full_path, proxy=active_source)
+            SaveData(full_path, proxy=triangulated)
 
             message = f"Saved active source to STL at: {full_path}"
             return True, message, full_path
@@ -286,6 +748,10 @@ class ParaViewManager:
                 from paraview.simple import Box
 
                 source = Box()
+            elif source_type == "glyph":
+                from paraview.simple import Glyph
+
+                source = Glyph()
             else:
                 return False, f"Unsupported source type: {source_type}", None, ""
 
@@ -494,6 +960,87 @@ class ParaViewManager:
         except Exception as e:
             self.logger.error(f"Error computing surface area: {str(e)}")
             return (False, f"Error computing surface area: {str(e)}", None)
+
+    def create_clip(
+        self,
+        origin_x=None,
+        origin_y=None,
+        origin_z=None,
+        normal_x=1,
+        normal_y=0,
+        normal_z=0,
+        invert=False,
+    ):
+        """
+        Create a clip filter to cut the data with a plane.
+
+        Args:
+            origin_x, origin_y, origin_z: Coordinates for clip plane origin (default: center of dataset).
+                                        If None, it uses the dataset's center.
+            normal_x, normal_y, normal_z: Normal of the clip plane (default: [1, 0, 0] for y-z plane).
+            invert (bool): If False, keeps the positive side of the plane normal.
+                        If True, keeps the negative side of the plane normal.
+
+        Returns:
+            tuple: (success: bool, message: str, clip_filter, clip_name: str)
+        """
+        try:
+            from paraview.simple import (
+                Clip,
+                GetActiveSource,
+                GetActiveView,
+                SetActiveSource,
+                Show,
+            )
+
+            base_source = self.original_source or GetActiveSource()
+            if not base_source:
+                return False, "Error: No active source. Load data first.", None, None
+
+            # If origin is unspecified, use the center of the dataset
+            if origin_x is not None and origin_y is not None and origin_z is not None:
+                origin = [origin_x, origin_y, origin_z]
+            else:
+                info = base_source.GetDataInformation()
+                bounds = info.GetBounds()
+                origin = [
+                    (bounds[0] + bounds[1]) / 2,
+                    (bounds[2] + bounds[3]) / 2,
+                    (bounds[4] + bounds[5]) / 2,
+                ]
+
+            normal = [normal_x, normal_y, normal_z]
+
+            # Create and configure the clip filter
+            clip_filter = Clip(Input=base_source)
+            clip_filter.ClipType = "Plane"
+            clip_filter.ClipType.Origin = origin
+            clip_filter.ClipType.Normal = normal
+
+            # Set invert property to control which side to keep
+            clip_filter.Invert = invert
+
+            # Show the clipped result in the view
+            view = GetActiveView()
+            Show(clip_filter, view)
+
+            # Set the clip as active source
+            SetActiveSource(clip_filter)
+
+            # Get the source name using the helper function
+            clip_name = self._get_source_name(clip_filter)
+
+            side_kept = "negative" if invert else "positive"
+            message = (
+                f"Created clip with plane at origin {origin}, normal {normal}. "
+                f"Keeping {side_kept} side of the plane. "
+                f"Clip name is: {clip_name}"
+            )
+            return True, message, clip_filter, clip_name
+
+        except Exception as e:
+            self.logger.error(f"Error creating clip: {str(e)}")
+            return False, f"Error creating clip: {str(e)}", None, None
 
     def create_slice(
         self,
@@ -773,55 +1320,46 @@ class ParaViewManager:
             self.logger.error(f"Error coloring by field: {str(e)}")
             return False, f"Error coloring by field: {str(e)}"
 
-    def set_color_map(self, preset_name="Blue-Red"):
-        """
-        Set the color map (lookup table) for the current visualization.
+    # def set_color_map(self, preset_name="Blue-Red"):
+    #     """
+    #     Set the color map (lookup table) for the current visualization.
 
-        Args:
-            preset_name: Name of the color map preset.
-                        Available presets include (but are not limited to):
-                        - Blue-Red
-                        - Cool to Warm
-                        - Viridis
-                        - Plasma
-                        - Magma
-                        - Inferno
-                        - Rainbow
-                        - Grayscale
+    #     Args:
+    #         preset_name: Name of the color map preset.
+    #                     Available presets include (but are not limited to):
+    #                     - Blue-Red
+    #                     - Cool to Warm
+    #                     - Viridis
+    #                     - Plasma
+    #                     - Magma
+    #                     - Inferno
+    #                     - Rainbow
+    #                     - Grayscale
 
-        Returns:
-            tuple: (success, message)
-        """
-        try:
-            from paraview.simple import (
-                ApplyPreset,
-                GetActiveSource,
-                GetActiveView,
-                GetDisplayProperties,
-            )
+    #     Returns:
+    #         tuple: (success, message)
+    #     """
+    #     try:
+    #         from paraview.simple import GetActiveSource, GetActiveView, GetDisplayProperties, ApplyPreset
+    #         source = GetActiveSource()
+    #         if not source:
+    #             return False, "Error: No active source. Load data first."
 
-            source = GetActiveSource()
-            if not source:
-                return False, "Error: No active source. Load data first."
+    #         view = GetActiveView()
+    #         display = GetDisplayProperties(source, view)
 
-            view = GetActiveView()
-            display = GetDisplayProperties(source, view)
+    #         color_tf = display.LookupTable
+    #         if not color_tf:
+    #             return False, "Error: No active color transfer function"
 
-            color_tf = display.LookupTable
-            if not color_tf:
-                return False, "Error: No active color transfer function"
+    #         # Apply the requested preset to the color transfer function.
+    #         ApplyPreset(color_tf, preset_name, True)
 
-            # Apply the requested preset to the color transfer function.
-            ApplyPreset(color_tf, preset_name, True)
-
-            available_presets = "Blue-Red, Cool to Warm, Viridis, Plasma, Magma, Inferno, Rainbow, Grayscale"
-            return (
-                True,
-                f"Applied color map preset: {preset_name}. Available presets include: {available_presets}",
-            )
-        except Exception as e:
-            self.logger.error(f"Error setting color map: {str(e)}")
-            return False, f"Error setting color map: {str(e)}"
+    #         available_presets = "Blue-Red, Cool to Warm, Viridis, Plasma, Magma, Inferno, Rainbow, Grayscale"
+    #         return True, f"Applied color map preset: {preset_name}. Available presets include: {available_presets}"
+    #     except Exception as e:
+    #         self.logger.error(f"Error setting color map: {str(e)}")
+    #         return False, f"Error setting color map: {str(e)}"
 
     def get_histogram(self, field=None, num_bins=256, data_location="POINTS"):
         """
@@ -1297,24 +1835,20 @@ class ParaViewManager:
 
     def get_screenshot(self):
         """
-        Capture a screenshot from the current view.
+        Capture a screenshot from the current view with optional compression.
 
         Returns:
             tuple: (success, message, img_path)
         """
         try:
+            import os
             import tempfile
 
             from paraview.collaboration import processServerEvents
 
             processServerEvents()
             from paraview import servermanager
-            from paraview.simple import (
-                RenderAllViews,
-                ResetCamera,
-                SaveScreenshot,
-                SetActiveView,
-            )
+            from paraview.simple import RenderAllViews, SaveScreenshot, SetActiveView
 
             # Get the active render view from the GUI connection
             pxm = servermanager.ProxyManager()
@@ -1326,25 +1860,110 @@ class ParaViewManager:
                     break
 
             if not gui_view:
-                print(
+                self.logger.error(
                     "No existing GUI render view found. Make sure the ParaView GUI is connected."
                 )
-                import sys
-
-                sys.exit(1)
+                return (
+                    False,
+                    "No GUI render view found. Ensure ParaView GUI is connected.",
+                    None,
+                )
 
             # Set the found GUI view active
             SetActiveView(gui_view)
             RenderAllViews()
 
-            import tempfile
+            # Determine output format and path based on compression settings
+            if self.compress_screenshots:
+                # Use JPEG for compression
+                suffix = ".jpg"
+                file_format = "JPEG"
+            else:
+                # Use PNG for lossless quality
+                suffix = ".png"
+                file_format = "PNG"
 
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 temp_path = tmp.name
 
-            SaveScreenshot(temp_path, gui_view)
-            # SaveScreenshot(temp_path, gui_view, ImageResolution=[1920, 1080])
+            # Save screenshot with appropriate settings
+            if self.compress_screenshots:
+                # Get current view size to calculate proportional scaling
+                view_size = gui_view.GetPropertyValue("ViewSize")
+                if view_size and len(view_size) >= 2:
+                    width, height = view_size[0], view_size[1]
+
+                    # Calculate new dimensions maintaining aspect ratio
+                    if width > self.max_screenshot_width:
+                        scale_factor = self.max_screenshot_width / width
+                        new_width = self.max_screenshot_width
+                        new_height = int(height * scale_factor)
+                    else:
+                        new_width = width
+                        new_height = height
+
+                    # Save with specified resolution
+                    SaveScreenshot(
+                        temp_path, gui_view, ImageResolution=[new_width, new_height]
+                    )
+
+                    self.logger.info(
+                        f"Screenshot saved with compression: {new_width}x{new_height}, "
+                        f"quality={self.screenshot_quality}"
+                    )
+                else:
+                    # Fallback if we can't get view size
+                    SaveScreenshot(
+                        temp_path,
+                        gui_view,
+                        ImageResolution=[
+                            self.max_screenshot_width,
+                            int(self.max_screenshot_width * 0.75),
+                        ],
+                    )
+            else:
+                # Save at full resolution without compression
+                SaveScreenshot(temp_path, gui_view)
+                self.logger.info(
+                    "Screenshot saved at full resolution without compression"
+                )
+
+            # If using JPEG, apply quality setting using PIL if available
+            if self.compress_screenshots and file_format == "JPEG":
+                try:
+                    from PIL import Image
+
+                    # Re-save with specified quality
+                    img = Image.open(temp_path)
+
+                    # Convert RGBA to RGB if necessary (JPEG doesn't support transparency)
+                    if img.mode in ("RGBA", "LA", "P"):
+                        rgb_img = Image.new("RGB", img.size, (255, 255, 255))
+                        if img.mode == "P":
+                            img = img.convert("RGBA")
+                        rgb_img.paste(
+                            img, mask=img.split()[-1] if img.mode == "RGBA" else None
+                        )
+                        img = rgb_img
+
+                    # Save with quality setting
+                    img.save(
+                        temp_path,
+                        "JPEG",
+                        quality=self.screenshot_quality,
+                        optimize=True,
+                    )
+
+                    # Log file size for monitoring
+                    file_size_kb = os.path.getsize(temp_path) / 1024
+                    self.logger.info(f"Screenshot compressed to {file_size_kb:.1f} KB")
+                except ImportError:
+                    self.logger.warning("PIL not available for JPEG quality control")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize JPEG: {e}")
+
             return True, "Screenshot captured", temp_path
+
         except Exception as e:
             self.logger.error(f"Error getting screenshot: {str(e)}")
             return False, f"Error getting screenshot: {str(e)}", None
@@ -1375,21 +1994,274 @@ class ParaViewManager:
             self.logger.error(f"Error rotating camera: {str(e)}")
             return False, f"Error rotating camera: {str(e)}"
 
-    def reset_camera(self):
+    def reset_colormaps(self, array_name=None):
         """
-        Reset the camera to show all data.
+        Reset colormaps and transfer functions to default settings.
+
+        Args:
+            array_name: Specific array name to reset. If None, attempts to detect and reset the currently displayed array.
 
         Returns:
             tuple: (success, message)
         """
         try:
-            from paraview.simple import GetActiveView, ResetCamera
+            from paraview.simple import (
+                GetActiveSource,
+                GetActiveView,
+                GetColorTransferFunction,
+                GetDisplayProperties,
+                GetOpacityTransferFunction,
+                Render,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "No active source found"
+
+            view = GetActiveView()
+            if not view:
+                return False, "No active view found"
+
+            display = GetDisplayProperties(source, view)
+            if not display:
+                return False, "No display properties found"
+
+            # Get the actual array being colored if not specified
+            if not array_name:
+                if hasattr(display, "ColorArrayName") and display.ColorArrayName:
+                    # ColorArrayName is typically ['POINTS', 'arrayname'] or ['CELLS', 'arrayname']
+                    array_name = (
+                        display.ColorArrayName[1]
+                        if len(display.ColorArrayName) > 1
+                        else None
+                    )
+
+            if not array_name:
+                # Try common array names as fallback
+                common_arrays = [
+                    "ImageFile",
+                    "MetaImage",
+                    "Scalars_",
+                    "RTData",
+                    "PointData",
+                ]
+                for arr in common_arrays:
+                    try:
+                        ctf = GetColorTransferFunction(arr)
+                        if ctf:
+                            array_name = arr
+                            break
+                    except:
+                        continue
+
+            if not array_name:
+                return False, "No array specified or currently being colored"
+
+            try:
+                # Get proper data range
+                data_range = None
+
+                # Try to rescale using display method first (most reliable)
+                if hasattr(display, "RescaleTransferFunctionToDataRange"):
+                    try:
+                        display.RescaleTransferFunctionToDataRange(True)
+                        self.logger.info(
+                            f"Rescaled transfer function to data range for {array_name}"
+                        )
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Could not rescale using display method: {e}"
+                        )
+
+                # Get the color transfer function
+                ctf = GetColorTransferFunction(array_name)
+                if ctf:
+                    # Try to get actual data range from source
+                    try:
+                        data_info = source.GetDataInformation()
+
+                        # Check point data first
+                        point_info = data_info.GetPointDataInformation()
+                        array_info = (
+                            point_info.GetArrayInformation(array_name)
+                            if point_info
+                            else None
+                        )
+
+                        if not array_info:
+                            # Check cell data
+                            cell_info = data_info.GetCellDataInformation()
+                            array_info = (
+                                cell_info.GetArrayInformation(array_name)
+                                if cell_info
+                                else None
+                            )
+
+                        if array_info and array_info.GetNumberOfComponents() > 0:
+                            data_range = list(array_info.GetComponentRange(0))
+                            self.logger.info(
+                                f"Found data range from array info: {data_range}"
+                            )
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Could not get data range from array info: {e}"
+                        )
+
+                    # Fallback to current CTF range if we couldn't get actual data range
+                    if (
+                        not data_range
+                        and hasattr(ctf, "RGBPoints")
+                        and len(ctf.RGBPoints) >= 4
+                    ):
+                        data_range = [ctf.RGBPoints[0], ctf.RGBPoints[-4]]
+                        self.logger.info(f"Using existing CTF range: {data_range}")
+
+                    # If still no range, use a sensible default
+                    if not data_range:
+                        data_range = [0.0, 1.0]
+                        self.logger.warning(f"Using default range [0, 1]")
+
+                    # Reset to data range
+                    ctf.RescaleTransferFunction(data_range[0], data_range[1])
+
+                    # Apply appropriate default preset
+                    preset_applied = False
+                    # Try common presets in order of preference
+                    presets = [
+                        "Rainbow Desaturated",
+                        "Cool to Warm",
+                        "Blue to Red Rainbow",
+                        "Jet",
+                        "Rainbow",
+                    ]
+                    for preset in presets:
+                        try:
+                            ctf.ApplyPreset(preset, True)
+                            self.logger.info(f"Applied preset: {preset}")
+                            preset_applied = True
+                            break
+                        except:
+                            continue
+
+                    if not preset_applied:
+                        self.logger.warning(
+                            "Could not apply any preset, keeping current colormap"
+                        )
+
+                # Reset opacity function
+                otf = GetOpacityTransferFunction(array_name)
+                if otf and data_range:
+                    # Check if volume rendering is being used
+                    is_volume = False
+                    if hasattr(display, "Representation"):
+                        is_volume = display.Representation == "Volume"
+
+                    if is_volume:
+                        # For volume rendering, set a more appropriate default opacity curve
+                        # Linear ramp from transparent to opaque
+                        mid_point = (data_range[0] + data_range[1]) / 2.0
+                        otf.Points = [
+                            data_range[0],
+                            0.0,
+                            0.5,
+                            0.0,
+                            mid_point,
+                            0.5,
+                            0.5,
+                            0.0,
+                            data_range[1],
+                            1.0,
+                            0.5,
+                            0.0,
+                        ]
+                        self.logger.info("Reset opacity for volume rendering")
+                    else:
+                        # For surface rendering, fully opaque
+                        otf.Points = [
+                            data_range[0],
+                            1.0,
+                            0.5,
+                            0.0,
+                            data_range[1],
+                            1.0,
+                            0.5,
+                            0.0,
+                        ]
+                        self.logger.info("Reset opacity for surface rendering")
+
+                # Force render to show changes
+                Render(view)
+
+                return (
+                    True,
+                    f"Successfully reset colormap for '{array_name}' with range [{data_range[0]:.3f}, {data_range[1]:.3f}]",
+                )
+
+            except Exception as e:
+                self.logger.error(
+                    f"Error resetting colormap for {array_name}: {str(e)}"
+                )
+                return False, f"Error resetting colormap for {array_name}: {str(e)}"
+
+        except Exception as e:
+            self.logger.error(f"Error in reset_colormaps: {str(e)}")
+            return False, f"Error in reset_colormaps: {str(e)}"
+
+    def reset_camera(self, padding_factor=1.0):
+        """
+        Reset the camera to show all data with optional padding for better framing.
+
+        Args:
+            padding_factor (float): Multiplier for camera distance to add padding around objects.
+                                   1.0 = no padding (default), 1.5 = 50% padding, 2.0 = 100% padding.
+                                   Recommended range: 1.0-2.0.
+
+        Returns:
+            tuple: (success, message)
+        """
+        try:
+            from paraview.simple import GetActiveView, Render, ResetCamera
 
             view = GetActiveView()
             if not view:
                 return False, "Error: No active view."
+
+            # Reset camera to fit all visible objects
             ResetCamera(view)
-            return True, "Camera reset"
+
+            # Apply padding by adjusting camera distance if requested
+            if padding_factor > 1.0:
+                camera = view.GetActiveCamera()
+                if camera:
+                    # Get current camera position and focal point
+                    position = camera.GetPosition()
+                    focal_point = camera.GetFocalPoint()
+
+                    # Calculate direction vector from focal point to camera
+                    import math
+
+                    dx = position[0] - focal_point[0]
+                    dy = position[1] - focal_point[1]
+                    dz = position[2] - focal_point[2]
+
+                    # Calculate current distance
+                    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+                    # Apply padding factor
+                    if distance > 0:
+                        scale = padding_factor
+                        new_position = [
+                            focal_point[0] + dx * scale,
+                            focal_point[1] + dy * scale,
+                            focal_point[2] + dz * scale,
+                        ]
+                        camera.SetPosition(new_position)
+                        Render(view)
+
+            padding_msg = (
+                f" with {padding_factor}x padding" if padding_factor > 1.0 else ""
+            )
+            return True, f"Camera reset{padding_msg}"
         except Exception as e:
             self.logger.error(f"Error resetting camera: {str(e)}")
             return False, f"Error resetting camera: {str(e)}"
@@ -1504,3 +2376,713 @@ class ParaViewManager:
         except Exception as e:
             self.logger.error(f"Error creating warp by vector: {str(e)}")
             return False, f"Error creating warp by vector: {str(e)}", None
+
+    def create_delaunay3d(self, alpha=0.0, offset=2.0, tolerance=0.001):
+        """
+        Create a 3D Delaunay triangulation of the active dataset.
+
+        Args:
+            alpha (float): Specify alpha (or distance) value to control output. For non-zero alpha value,
+                          only edges or triangles contained within alpha radius are output.
+                          Default is 0.0 which produces the convex hull.
+            offset (float): Offset to multiply the radius of the circumsphere by. Default is 2.0.
+            tolerance (float): Specify a tolerance to control discarding of degenerate tetrahedra. Default is 0.001.
+
+        Returns:
+            tuple: (success: bool, message: str, delaunay_filter, delaunay_name: str)
+        """
+        try:
+            from paraview.simple import (
+                Delaunay3D,
+                GetActiveSource,
+                GetActiveView,
+                SetActiveSource,
+                Show,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Check if source has points to triangulate
+            data_info = source.GetDataInformation()
+            if data_info.GetNumberOfPoints() < 4:
+                return (
+                    False,
+                    "Error: Source must have at least 4 points for 3D Delaunay triangulation.",
+                    None,
+                    "",
+                )
+
+            # Create the Delaunay3D filter
+            delaunay_filter = Delaunay3D(Input=source)
+            delaunay_filter.Alpha = alpha
+            delaunay_filter.Offset = offset
+            delaunay_filter.Tolerance = tolerance
+
+            # Show the result in the active view
+            view = GetActiveView()
+            display = Show(delaunay_filter, view)
+
+            # Set to wireframe representation to clearly show the triangulation mesh
+            display.SetRepresentationType("Wireframe")
+
+            # Set the delaunay filter as the active source
+            SetActiveSource(delaunay_filter)
+
+            # Get the source name using the helper function
+            delaunay_name = self._get_source_name(delaunay_filter)
+
+            message = f"Created 3D Delaunay triangulation with alpha={alpha}, offset={offset}, tolerance={tolerance}. Set to wireframe representation to show triangular mesh. Filter name: {delaunay_name}"
+            return True, message, delaunay_filter, delaunay_name
+
+        except Exception as e:
+            self.logger.error(f"Error creating 3D Delaunay triangulation: {str(e)}")
+            return (
+                False,
+                f"Error creating 3D Delaunay triangulation: {str(e)}",
+                None,
+                "",
+            )
+
+    def filter_data(
+        self,
+        filter_type="threshold",
+        field_name=None,
+        min_value=None,
+        max_value=None,
+        invert=False,
+        all_points=False,
+    ):
+        """
+        Apply data filtering operations including threshold and selection extraction.
+        Combines threshold and extract selection functionality into a single versatile filter.
+
+        Args:
+            filter_type (str): Type of filter - "threshold", "clip_scalar", or "extract_selection"
+            field_name (str): Name of the scalar field to filter by
+            min_value (float, optional): Minimum threshold value
+            max_value (float, optional): Maximum threshold value
+            invert (bool): Whether to invert the selection (keep values outside range)
+            all_points (bool): For threshold - whether to include all points in cells that pass
+
+        Returns:
+            tuple: (success: bool, message: str, filter_object, filter_name: str)
+        """
+        try:
+            from paraview.simple import (
+                GetActiveSource,
+                GetActiveView,
+                SetActiveSource,
+                Show,
+                Threshold,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Auto-detect field if not provided
+            if field_name is None:
+                data_info = source.GetDataInformation()
+                point_info = data_info.GetPointDataInformation()
+                if point_info.GetNumberOfArrays() > 0:
+                    field_name = point_info.GetArrayInformation(0).GetName()
+                else:
+                    cell_info = data_info.GetCellDataInformation()
+                    if cell_info.GetNumberOfArrays() > 0:
+                        field_name = cell_info.GetArrayInformation(0).GetName()
+                    else:
+                        return (
+                            False,
+                            "Error: No data arrays found for filtering.",
+                            None,
+                            "",
+                        )
+
+            # Create appropriate filter based on type
+            if filter_type.lower() in ["threshold", "extract_selection"]:
+                filter_obj = Threshold(Input=source)
+
+                # Set the scalar array to threshold by
+                filter_obj.Scalars = ["POINTS", field_name]  # Try points first
+
+                # Handle threshold range - use LowerThreshold/UpperThreshold for ParaView 5.10+ compatibility
+                if min_value is not None and max_value is not None:
+                    filter_obj.LowerThreshold = min_value
+                    filter_obj.UpperThreshold = max_value
+                elif min_value is not None:
+                    filter_obj.LowerThreshold = min_value
+                    filter_obj.UpperThreshold = float("inf")
+                elif max_value is not None:
+                    filter_obj.LowerThreshold = float("-inf")
+                    filter_obj.UpperThreshold = max_value
+                else:
+                    # Get data range for default thresholding
+                    data_info = source.GetDataInformation()
+                    point_info = data_info.GetPointDataInformation()
+                    for i in range(point_info.GetNumberOfArrays()):
+                        array_info = point_info.GetArrayInformation(i)
+                        if array_info.GetName() == field_name:
+                            data_range = array_info.GetComponentRange(0)
+                            mid_value = (data_range[0] + data_range[1]) / 2
+                            filter_obj.LowerThreshold = mid_value
+                            filter_obj.UpperThreshold = data_range[1]
+                            break
+
+                # Set additional properties
+                filter_obj.Invert = invert
+                # Note: AllPoints is not a valid property for Threshold filter in current ParaView version
+
+                operation_desc = f"threshold on field '{field_name}'"
+                if min_value is not None and max_value is not None:
+                    operation_desc += f" range [{min_value}, {max_value}]"
+                elif min_value is not None:
+                    operation_desc += f" >= {min_value}"
+                elif max_value is not None:
+                    operation_desc += f" <= {max_value}"
+
+            else:
+                return (
+                    False,
+                    f"Error: Unsupported filter type '{filter_type}'.",
+                    None,
+                    "",
+                )
+
+            # Show the result
+            view = GetActiveView()
+            Show(filter_obj, view)
+            SetActiveSource(filter_obj)
+
+            # Get filter name
+            filter_name = self._get_source_name(filter_obj)
+
+            message = f"Applied {operation_desc}. Filter name: {filter_name}"
+            if invert:
+                message += " (inverted)"
+
+            return True, message, filter_obj, filter_name
+
+        except Exception as e:
+            self.logger.error(f"Error applying data filter: {str(e)}")
+            return False, f"Error applying data filter: {str(e)}", None, ""
+
+    def calculate_field(self, result_name, expression, attribute_mode="Point Data"):
+        """
+        Apply mathematical calculations to create new data fields.
+        Combines calculator functionality with support for common mathematical operations.
+
+        Args:
+            result_name (str): Name for the new calculated field
+            expression (str): Mathematical expression to evaluate
+                            Examples: "sqrt(velocity_X^2 + velocity_Y^2 + velocity_Z^2)"
+                                    "pressure * 2.0"
+                                    "coords_X + coords_Y + coords_Z"
+            attribute_mode (str): "Point Data" or "Cell Data" - where to store result
+
+        Returns:
+            tuple: (success: bool, message: str, calculator, calculator_name: str)
+        """
+        try:
+            from paraview.simple import (
+                Calculator,
+                GetActiveSource,
+                GetActiveView,
+                SetActiveSource,
+                Show,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Create calculator filter
+            calc_filter = Calculator(Input=source)
+            calc_filter.ResultArrayName = result_name
+            calc_filter.Function = expression
+            calc_filter.AttributeType = attribute_mode
+
+            # Show the result
+            view = GetActiveView()
+            Show(calc_filter, view)
+            SetActiveSource(calc_filter)
+
+            # Get filter name
+            calc_name = self._get_source_name(calc_filter)
+
+            message = f"Created calculated field '{result_name}' using expression '{expression}'. Calculator name: {calc_name}"
+            return True, message, calc_filter, calc_name
+
+        except Exception as e:
+            self.logger.error(f"Error creating calculated field: {str(e)}")
+            return False, f"Error creating calculated field: {str(e)}", None, ""
+
+    def transform_data(
+        self,
+        operation="translate",
+        translate_x=0.0,
+        translate_y=0.0,
+        translate_z=0.0,
+        rotate_x=0.0,
+        rotate_y=0.0,
+        rotate_z=0.0,
+        scale_x=1.0,
+        scale_y=1.0,
+        scale_z=1.0,
+    ):
+        """
+        Apply geometric transformations to datasets.
+        Combines translation, rotation, and scaling into a single versatile transform operation.
+
+        Args:
+            operation (str): Transform type - "translate", "rotate", "scale", or "combined"
+            translate_x, translate_y, translate_z (float): Translation amounts
+            rotate_x, rotate_y, rotate_z (float): Rotation angles in degrees
+            scale_x, scale_y, scale_z (float): Scale factors
+
+        Returns:
+            tuple: (success: bool, message: str, transform, transform_name: str)
+        """
+        try:
+            from paraview.simple import (
+                GetActiveSource,
+                GetActiveView,
+                SetActiveSource,
+                Show,
+                Transform,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Create transform filter
+            transform_filter = Transform(Input=source)
+            transform_filter.Transform = "Transform"
+
+            # Apply transformations based on operation type
+            operations_applied = []
+
+            if operation.lower() in ["translate", "combined"]:
+                if translate_x != 0.0 or translate_y != 0.0 or translate_z != 0.0:
+                    transform_filter.Transform.Translate = [
+                        translate_x,
+                        translate_y,
+                        translate_z,
+                    ]
+                    operations_applied.append(
+                        f"translate({translate_x}, {translate_y}, {translate_z})"
+                    )
+
+            if operation.lower() in ["rotate", "combined"]:
+                if rotate_x != 0.0 or rotate_y != 0.0 or rotate_z != 0.0:
+                    transform_filter.Transform.Rotate = [rotate_x, rotate_y, rotate_z]
+                    operations_applied.append(
+                        f"rotate({rotate_x}°, {rotate_y}°, {rotate_z}°)"
+                    )
+
+            if operation.lower() in ["scale", "combined"]:
+                if scale_x != 1.0 or scale_y != 1.0 or scale_z != 1.0:
+                    transform_filter.Transform.Scale = [scale_x, scale_y, scale_z]
+                    operations_applied.append(f"scale({scale_x}, {scale_y}, {scale_z})")
+
+            # Show the result
+            view = GetActiveView()
+            Show(transform_filter, view)
+            SetActiveSource(transform_filter)
+
+            # Get transform name
+            transform_name = self._get_source_name(transform_filter)
+
+            operations_str = (
+                " + ".join(operations_applied)
+                if operations_applied
+                else "identity transform"
+            )
+            message = f"Applied geometric transform: {operations_str}. Transform name: {transform_name}"
+
+            return True, message, transform_filter, transform_name
+
+        except Exception as e:
+            self.logger.error(f"Error applying transform: {str(e)}")
+            return False, f"Error applying transform: {str(e)}", None, ""
+
+    def create_vector_visualization(
+        self,
+        glyph_type="arrow",
+        vector_field=None,
+        scale_factor=None,
+        scale_mode="vector",
+        max_number_of_glyphs=5000,
+        auto_scale=True,
+        scale_percentage=0.01,
+    ):
+        """
+        Create vector field visualizations using glyphs.
+        Combines glyph functionality for arrows, cones, spheres to visualize vector data.
+
+        Args:
+            glyph_type (str): Type of glyph - "arrow", "cone", "sphere", "line"
+            vector_field (str, optional): Name of vector field. Auto-detected if None.
+            scale_factor (float, optional): Overall scaling factor for glyphs. Auto-computed if None.
+            scale_mode (str): "vector", "scalar", or "off" - how to scale glyphs
+            max_number_of_glyphs (int): Maximum number of glyphs to display
+            auto_scale (bool): Automatically compute scale factor based on data bounds if scale_factor is None
+            scale_percentage (float): Percentage of data diagonal to use for auto-scaling (default: 0.01 = 1%)
+
+        Returns:
+            tuple: (success: bool, message: str, glyph_filter, glyph_name: str)
+        """
+        try:
+            from paraview.simple import (
+                Arrow,
+                Cone,
+                GetActiveSource,
+                GetActiveView,
+                Glyph,
+                Line,
+                SetActiveSource,
+                Show,
+                Sphere,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Auto-detect vector field if not provided
+            if vector_field is None:
+                data_info = source.GetDataInformation()
+                point_info = data_info.GetPointDataInformation()
+                for i in range(point_info.GetNumberOfArrays()):
+                    array_info = point_info.GetArrayInformation(i)
+                    # Only use arrays with exactly 3 components (vectors)
+                    # Skip gradient tensors (9 components) and other multi-component arrays
+                    if array_info.GetNumberOfComponents() == 3:
+                        vector_field = array_info.GetName()
+                        break
+
+                if vector_field is None:
+                    return (
+                        False,
+                        "Error: No 3-component vector field found for glyph visualization.",
+                        None,
+                        "",
+                    )
+
+            # Auto-compute scale factor based on data bounds if not provided
+            if scale_factor is None and auto_scale:
+                data_info = source.GetDataInformation()
+                bounds = data_info.GetBounds()
+                # Compute diagonal of bounding box
+                diagonal = (
+                    (bounds[1] - bounds[0]) ** 2
+                    + (bounds[3] - bounds[2]) ** 2
+                    + (bounds[5] - bounds[4]) ** 2
+                ) ** 0.5
+                # Use scale_percentage of diagonal (default 1%)
+                scale_factor = diagonal * scale_percentage
+                self.logger.info(
+                    f"Auto-computed glyph scale factor: {scale_factor} ({scale_percentage * 100}% of data diagonal)"
+                )
+            elif scale_factor is None:
+                scale_factor = 1.0  # Default if auto_scale is False
+
+            # Map glyph type string to proper glyph source
+            glyph_type_map = {
+                "arrow": "Arrow",
+                "cone": "Cone",
+                "sphere": "Sphere",
+                "line": "Line",
+            }
+
+            glyph_type_name = glyph_type_map.get(glyph_type.lower(), "Arrow")
+
+            # Create glyph filter with proper GlyphType
+            glyph_filter = Glyph(Input=source)
+            glyph_filter.GlyphType = glyph_type_name
+
+            # Set vector field for orientation and scaling
+            glyph_filter.OrientationArray = ["POINTS", vector_field]
+            glyph_filter.ScaleArray = (
+                ["POINTS", vector_field] if scale_mode == "vector" else ["POINTS", ""]
+            )
+            glyph_filter.ScaleFactor = scale_factor
+
+            # Control glyph density
+            glyph_filter.MaximumNumberOfSamplePoints = max_number_of_glyphs
+
+            # Set scaling mode using the VectorScaleMode property (ParaView 5.x+)
+            if scale_mode.lower() == "vector":
+                # When scaling by vector, use VectorScaleMode property
+                glyph_filter.VectorScaleMode = "Scale by Magnitude"
+                glyph_filter.ScaleFactor = scale_factor
+            elif scale_mode.lower() == "scalar":
+                # ScaleArray already set to appropriate scalar field above
+                glyph_filter.ScaleFactor = scale_factor
+            else:
+                # No scaling - use uniform size
+                glyph_filter.ScaleArray = ["POINTS", ""]
+                glyph_filter.ScaleFactor = scale_factor
+
+            # Update pipeline before showing (ensures VTK objects are initialized)
+            from paraview.simple import UpdatePipeline
+
+            UpdatePipeline(proxy=glyph_filter)
+
+            # Show the result
+            view = GetActiveView()
+            Show(glyph_filter, view)
+            SetActiveSource(glyph_filter)
+
+            # Get glyph name
+            glyph_name = self._get_source_name(glyph_filter)
+
+            message = f"Created {glyph_type} glyph visualization for vector field '{vector_field}'. Filter name: {glyph_name}"
+            return True, message, glyph_filter, glyph_name
+
+        except Exception as e:
+            self.logger.error(f"Error creating vector visualization: {str(e)}")
+            return False, f"Error creating vector visualization: {str(e)}", None, ""
+
+    def analyze_field_data(
+        self,
+        analysis_type="gradient",
+        field_name=None,
+        compute_vorticity=False,
+        compute_divergence=False,
+        compute_qcriterion=False,
+    ):
+        """
+        Analyze field data including gradients, derivatives, and connectivity.
+        Combines gradient computation and connectivity analysis into a unified interface.
+
+        Args:
+            analysis_type (str): "gradient", "connectivity", or "combined"
+            field_name (str, optional): Field to analyze. Auto-detected if None.
+            compute_vorticity (bool): Compute vorticity for vector fields
+            compute_divergence (bool): Compute divergence for vector fields
+            compute_qcriterion (bool): Compute Q-criterion for vector fields
+
+        Returns:
+            tuple: (success: bool, message: str, analysis_filter, filter_name: str)
+        """
+        try:
+            from paraview.simple import (
+                Connectivity,
+                GetActiveSource,
+                GetActiveView,
+                Gradient,
+                SetActiveSource,
+                Show,
+            )
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", None, ""
+
+            # Auto-detect field if not provided
+            if field_name is None and analysis_type.lower() in ["gradient", "combined"]:
+                data_info = source.GetDataInformation()
+                point_info = data_info.GetPointDataInformation()
+                if point_info.GetNumberOfArrays() > 0:
+                    # Prefer vector fields for gradient analysis
+                    for i in range(point_info.GetNumberOfArrays()):
+                        array_info = point_info.GetArrayInformation(i)
+                        if array_info.GetNumberOfComponents() >= 3:
+                            field_name = array_info.GetName()
+                            break
+                    # Fall back to any field
+                    if field_name is None:
+                        field_name = point_info.GetArrayInformation(0).GetName()
+
+            results = []
+            filter_objects = []
+
+            # Apply gradient analysis
+            if analysis_type.lower() in ["gradient", "combined"]:
+                if field_name:
+                    from paraview.simple import UpdatePipeline
+
+                    gradient_filter = Gradient(Input=source)
+                    gradient_filter.ScalarArray = ["POINTS", field_name]
+
+                    # Configure gradient computation options
+                    if compute_vorticity:
+                        gradient_filter.ComputeVorticity = True
+                    if compute_divergence:
+                        gradient_filter.ComputeDivergence = True
+                    if compute_qcriterion:
+                        gradient_filter.ComputeQCriterion = True
+
+                    # Update pipeline to ensure VTK objects are initialized
+                    UpdatePipeline(proxy=gradient_filter)
+
+                    Show(gradient_filter)
+                    filter_objects.append(gradient_filter)
+                    grad_name = self._get_source_name(gradient_filter)
+                    results.append(
+                        f"gradient analysis of '{field_name}' -> {grad_name}"
+                    )
+
+                    # Set as active for further processing
+                    SetActiveSource(gradient_filter)
+                    primary_filter = gradient_filter
+                else:
+                    return (
+                        False,
+                        "Error: No field available for gradient analysis.",
+                        None,
+                        "",
+                    )
+
+            # Apply connectivity analysis
+            if analysis_type.lower() in ["connectivity", "combined"]:
+                # Use current active source (might be gradient result)
+                current_source = GetActiveSource()
+                connectivity_filter = Connectivity(Input=current_source)
+
+                Show(connectivity_filter)
+                filter_objects.append(connectivity_filter)
+                conn_name = self._get_source_name(connectivity_filter)
+                results.append(f"connectivity analysis -> {conn_name}")
+
+                SetActiveSource(connectivity_filter)
+                primary_filter = connectivity_filter
+
+            # Return information about primary filter
+            if filter_objects:
+                primary_name = self._get_source_name(primary_filter)
+                analysis_desc = " + ".join(results)
+                message = f"Applied field analysis: {analysis_desc}"
+                return True, message, primary_filter, primary_name
+            else:
+                return False, "Error: No analysis operations were performed.", None, ""
+
+        except Exception as e:
+            self.logger.error(f"Error analyzing field data: {str(e)}")
+            return False, f"Error analyzing field data: {str(e)}", None, ""
+
+    def export_data(self, export_format="csv", filename=None, export_type="all"):
+        """
+        Export data in various formats with enhanced capabilities.
+        Combines multiple export formats into a single versatile function.
+
+        Args:
+            export_format (str): "csv", "vtk", "stl", "ply", "obj"
+            filename (str, optional): Output filename. Auto-generated if None.
+            export_type (str): "all", "points", "cells", "arrays" - what to export
+
+        Returns:
+            tuple: (success: bool, message: str, exported_path: str)
+        """
+        try:
+            import os
+
+            from paraview.simple import GetActiveSource, SaveData
+
+            source = GetActiveSource()
+            if not source:
+                return False, "Error: No active source. Load data first.", ""
+
+            # Generate filename if not provided
+            if filename is None:
+                source_name = self._get_source_name(source) or "data"
+                filename = f"{source_name}_export.{export_format.lower()}"
+
+            # Ensure we have the data folder path, use current directory as fallback
+            if not hasattr(self, "_data_folder") or not self._data_folder:
+                self._data_folder = os.getcwd()
+                self.logger.info(
+                    f"No data folder set, using current directory: {self._data_folder}"
+                )
+            export_path = os.path.join(self._data_folder, filename)
+
+            # Configure export options based on format
+            export_options = {}
+
+            if export_format.lower() == "csv":
+                # For CSV, we typically want point data
+                # Note: Some ParaView versions may not support all options
+                try:
+                    # Try to set options if they exist
+                    export_options["FieldAssociation"] = "Point Data"
+                except:
+                    pass  # Option not available in this version
+
+            elif export_format.lower() in ["vtk", "vtu", "vtp"]:
+                # VTK formats support full data preservation
+                export_options["DataMode"] = "Binary"  # More efficient than ASCII
+
+            elif export_format.lower() in ["stl", "ply", "obj"]:
+                # Mesh formats - ensure we have surface data
+                data_info = source.GetDataInformation()
+                if data_info.GetDataSetType() not in [
+                    0,
+                    4,
+                ]:  # Not polydata or unstructured grid
+                    return (
+                        False,
+                        f"Error: {export_format.upper()} export requires surface/mesh data. Current data type not suitable.",
+                        "",
+                    )
+
+            # Perform the export
+            SaveData(export_path, proxy=source, **export_options)
+
+            # Verify export succeeded
+            if os.path.exists(export_path):
+                file_size = os.path.getsize(export_path)
+                message = f"Successfully exported data to {export_format.upper()} format: {export_path} ({file_size} bytes)"
+                return True, message, export_path
+            else:
+                return (
+                    False,
+                    f"Error: Export to {export_path} failed - file not created.",
+                    "",
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error exporting data: {str(e)}")
+            return False, f"Error exporting data: {str(e)}", ""
+
+    def save_state(
+        self, save_directory: str, filename: str = "paraview_state.pvsm"
+    ) -> tuple[bool, str, str]:
+        """
+        Save the current ParaView state to a file.
+
+        Args:
+            save_directory: Directory where the state file will be saved
+            filename: Name of the state file (default: "paraview_state.pvsm")
+
+        Returns:
+            tuple: (success, message, file_path)
+        """
+        try:
+            import os
+            from pathlib import Path
+
+            # Ensure the directory exists
+            save_dir = Path(save_directory)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # Ensure filename has .pvsm extension
+            if not filename.endswith(".pvsm"):
+                filename += ".pvsm"
+
+            # Full path to the state file
+            state_file_path = save_dir / filename
+
+            # Save the state
+            SaveState(str(state_file_path))
+
+            message = f"ParaView state saved successfully to: {state_file_path}"
+            self.logger.info(message)
+            return True, message, str(state_file_path)
+
+        except Exception as e:
+            error_msg = f"Error saving ParaView state: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg, ""
