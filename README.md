@@ -14,6 +14,7 @@ ParaView-MCP is an autonomous visualization agent that exposes `paraview.simple`
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Development environment setup](#development-environment-setup)
 - [Running](#running)
 - [Integration: OpenCode](#integration-opencode)
 - [Integration: Claude Code](#integration-claude-code)
@@ -62,13 +63,84 @@ pip install -e .
 
 The `pip install -e .` step registers the `paraview-mcp` console script and installs the `mcp` and `httpx` runtime dependencies. The `paraview` package itself is provided by conda and is intentionally absent from `pyproject.toml` (it cannot be pip-installed).
 
-### Developer install
+> **Python version:** the active conda env _is_ the runtime. Its Python interpreter (3.10, supplied by the pinned `paraview=5.13.3=py310...` package) is what `pip install -e .` and the `paraview-mcp` console script execute on. `.python-version` (`3.14`) and `pyproject.toml`'s `requires-python = ">=3.10"` are advisory only — they do not change the runtime interpreter.
 
-For contributors who need pre-commit hooks, `uv`, and `ruff`:
+## Development environment setup
+
+Contributors need the runtime conda env plus the dev tooling (pre-commit, `ruff`, `uv`) declared under `[dependency-groups].dev` in `pyproject.toml`.
+
+### One-shot setup (recommended)
+
+From an already-installed conda (with `conda-forge` configured), run:
 
 ```bash
-uv sync --group dev
+make create-dev
 ```
+
+This Makefile target:
+
+1. Creates or updates the `paraview_mcp` conda env from `environment.yaml` (`conda env update --file environment.yaml --prune`).
+2. Installs the git pre-commit hooks inside that env (`conda run -n paraview_mcp pre-commit install`).
+3. Removes any leftover `.venv/` directory and runs `uv sync --group dev` inside the conda env to install the dev dependency group.
+
+After it finishes, activate the env and you are ready to develop:
+
+```bash
+conda activate paraview_mcp
+pip install -e .          # if you have not already, registers the console script
+```
+
+### Manual setup
+
+If you prefer to do each step by hand:
+
+```bash
+# 1. Create the conda env (provides Python 3.10, paraview 5.13.3, pvserver)
+conda env create -f environment.yaml -n paraview_mcp
+conda activate paraview_mcp
+
+# 2. Editable install of paraview-mcp itself
+pip install -e .
+
+# 3. Dev tooling (pre-commit, ruff, uv) from the `dev` dependency group
+uv sync --group dev
+
+# 4. Install the git pre-commit hooks
+pre-commit install
+```
+
+### Pre-commit
+
+Pre-commit is the source of truth for formatting and linting. The configured hooks (`.pre-commit-config.yaml`) include `ruff-format`, `ruff-check`, `isort`, `bandit`, the stock `pre-commit-hooks`, and `prettier` (invoked via `bunx`, so you also need [`bun`](https://bun.sh) installed for the prettier hook to run).
+
+Run all hooks across the repo with:
+
+```bash
+pre-commit run --all-files
+```
+
+### Updating `environment.yaml`
+
+After adding or removing packages in the conda env, regenerate the pin file with:
+
+```bash
+make freeze
+```
+
+This runs `conda env export -n paraview_mcp` (stripped of the machine-specific `prefix:` line) and writes it to `environment.yaml`. **Manually verify** afterwards that:
+
+1. `channels:` still lists `conda-forge` and `nodefaults` (in that order).
+2. The `pip:` section does **not** contain a self-reference to `paraview-mcp` — `conda env export` will include the editable install; delete that entry before committing.
+
+### Building a release artifact
+
+`make build` packages the project for distribution:
+
+```bash
+make build
+```
+
+It clears `dist/`, sets the project version from the latest git tag via `uv version`, runs `uv build`, and reinstalls the resulting sdist with `uv pip install dist/*.tar.gz`. A git tag must already exist for the version-setting step to succeed.
 
 ## Running
 
@@ -222,18 +294,7 @@ All tools are defined in `paraview_mcp/main.py` as `@mcp.tool()` functions and d
 
 ### Updating pinned conda dependencies
 
-After adding or removing packages from the conda env, regenerate `environment.yaml`:
-
-```bash
-conda env export -n paraview_mcp | grep -v "^prefix:" > environment.yaml
-```
-
-Then open `environment.yaml` and manually verify:
-
-1. `channels:` lists `conda-forge` and `nodefaults` (in that order).
-2. The `pip:` section does **not** include a self-reference to `paraview-mcp` (remove the editable install entry before committing).
-
-Commit the updated `environment.yaml` so the pinned environment is reproducible.
+Use `make freeze` and verify the result as described in [Updating `environment.yaml`](#updating-environmentyaml) under the development setup section. Commit the updated `environment.yaml` so the pinned environment stays reproducible.
 
 ## Troubleshooting / FAQ
 
