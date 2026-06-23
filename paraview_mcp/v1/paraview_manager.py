@@ -1210,7 +1210,7 @@ class ParaViewManager:
 
             if enable:
                 display.Visibility = 1
-                status_message = "Element was made visibile"
+                status_message = "Element was made visible"
             else:
                 display.Visibility = 0
                 status_message = "Rendering hidden (representation preserved)"

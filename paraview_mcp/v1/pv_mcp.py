@@ -22,11 +22,11 @@ from paraview_mcp.v1.paraview_manager import ParaViewManager
 default_prompt = """
 When using ParaView through this interface, please follow these guidelines:
 
-1. IMPORTANT: Only call strictly necessary ParaView functions per reply (and please limit the total number of call per reply). This ensures operations execute in a more interative manner and no excessive calls to related but non-essential functions.
+1. IMPORTANT: Only call the ParaView functions that are strictly necessary per reply, and keep the total number of calls per reply small. This keeps operations interactive and avoids excessive calls to related but non-essential functions.
 
-2. The only execute multiple repeated function call when given a target goal (e.g., identify a specific object), where different parameters need to used (e.g., isosurface with different isovalue). Avoid repeated calling of color map function unless user specific ask for color map design.
+2. Only make repeated calls to the same function when working toward a specific goal (e.g., identifying an object) that requires different parameters each time (e.g., an isosurface at several isovalues). Avoid repeatedly calling the color map function unless the user specifically asks for color map design.
 
-3. Paraview will be connect to mcp server on starup so no need to connect first.
+3. ParaView is connected to the MCP server on startup, so there is no need to connect first.
 
 
 """
@@ -113,9 +113,7 @@ def load_raw_data(
     # Validate data type
     valid_types = ["uint8", "uint16", "int8", "int16", "float32", "float64"]
     if data_type not in valid_types:
-        return (
-            f"Invalid data_type '{data_type}'. Must be one of: {', '.join(valid_types)}"
-        )
+        return f"Invalid data_type '{data_type}'. Must be one of: {', '.join(valid_types)}"
 
     # Call the manager's load_raw_data method
     success, message, _, source_name = pv_manager.load_raw_data(
@@ -164,7 +162,9 @@ def save_paraview_state(
     Returns:
         Status message with the full path to the saved state file
     """
-    success, message, file_path = pv_manager.save_state(save_directory, filename)
+    success, message, file_path = pv_manager.save_state(
+        save_directory, filename
+    )
     if success:
         return f"{message}"
     else:
@@ -411,7 +411,9 @@ def get_active_source_names_by_type(source_type: str = None) -> str:
 
 # Compatible with OpenAI tool using
 @mcp.tool()
-def edit_volume_opacity(field_name: str, opacity_points: list[dict[str, float]]) -> str:
+def edit_volume_opacity(
+    field_name: str, opacity_points: list[dict[str, float]]
+) -> str:
     """
     Edit ONLY the opacity transfer function for the specified field.
 
@@ -424,7 +426,9 @@ def edit_volume_opacity(field_name: str, opacity_points: list[dict[str, float]])
         A status message (success or error)
     """
     formatted_points = [[pt["value"], pt["alpha"]] for pt in opacity_points]
-    success, message = pv_manager.edit_volume_opacity(field_name, formatted_points)
+    success, message = pv_manager.edit_volume_opacity(
+        field_name, formatted_points
+    )
     return message
 
 
@@ -472,7 +476,9 @@ def set_color_map(field_name: str, color_points: list[dict]) -> str:
     """
     # Transform color_points to expected internal format: list[tuple[float, tuple[float, float, float]]]
     try:
-        formatted_points = [(pt["value"], tuple(pt["rgb"])) for pt in color_points]
+        formatted_points = [
+            (pt["value"], tuple(pt["rgb"])) for pt in color_points
+        ]
     except Exception as e:
         return f"Invalid format for color_points: {e}"
 
@@ -720,7 +726,9 @@ def reset_colormaps(array_name: str = None) -> str:
 
 @mcp.tool()
 def plot_over_line(
-    point1: list[float] = None, point2: list[float] = None, resolution: int = 100
+    point1: list[float] = None,
+    point2: list[float] = None,
+    resolution: int = 100,
 ) -> str:
     """
     Create a 'Plot Over Line' filter to sample data along a line between two points.
@@ -922,17 +930,19 @@ def transform_data(
     Returns:
         Status message
     """
-    success, message, transform_filter, transform_name = pv_manager.transform_data(
-        operation,
-        translate_x,
-        translate_y,
-        translate_z,
-        rotate_x,
-        rotate_y,
-        rotate_z,
-        scale_x,
-        scale_y,
-        scale_z,
+    success, message, transform_filter, transform_name = (
+        pv_manager.transform_data(
+            operation,
+            translate_x,
+            translate_y,
+            translate_z,
+            rotate_x,
+            rotate_y,
+            rotate_z,
+            scale_x,
+            scale_y,
+            scale_z,
+        )
     )
     if success:
         return f"{message}. Transform registered as '{transform_name}'."
@@ -970,14 +980,16 @@ def create_vector_visualization(
     Returns:
         Status message
     """
-    success, message, glyph_filter, glyph_name = pv_manager.create_vector_visualization(
-        glyph_type,
-        vector_field,
-        scale_factor,
-        scale_mode,
-        max_number_of_glyphs,
-        auto_scale,
-        scale_percentage,
+    success, message, glyph_filter, glyph_name = (
+        pv_manager.create_vector_visualization(
+            glyph_type,
+            vector_field,
+            scale_factor,
+            scale_mode,
+            max_number_of_glyphs,
+            auto_scale,
+            scale_percentage,
+        )
     )
     if success:
         return f"{message}. Glyph filter registered as '{glyph_name}'."
@@ -1007,12 +1019,14 @@ def analyze_field_data(
     Returns:
         Status message
     """
-    success, message, analysis_filter, filter_name = pv_manager.analyze_field_data(
-        analysis_type,
-        field_name,
-        compute_vorticity,
-        compute_divergence,
-        compute_qcriterion,
+    success, message, analysis_filter, filter_name = (
+        pv_manager.analyze_field_data(
+            analysis_type,
+            field_name,
+            compute_vorticity,
+            compute_divergence,
+            compute_qcriterion,
+        )
     )
     if success:
         return f"{message}. Analysis filter registered as '{filter_name}'."
@@ -1059,8 +1073,8 @@ def create_delaunay3d(
     Returns:
         Status message
     """
-    success, message, delaunay_filter, delaunay_name = pv_manager.create_delaunay3d(
-        alpha, offset, tolerance
+    success, message, delaunay_filter, delaunay_name = (
+        pv_manager.create_delaunay3d(alpha, offset, tolerance)
     )
     if success:
         return f"{message}. Filter registered as '{delaunay_name}'."
