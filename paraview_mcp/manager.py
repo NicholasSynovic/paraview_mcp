@@ -1,7 +1,11 @@
 """
-ParaView Instance Manager
+ParaView Instance Manager.
 
-This class encapsulates paraview.simple API to expose a higher-level API that is compatible with LLM access/control.
+This class encapsulates the ``paraview.simple`` API to expose a higher-level
+API that is compatible with LLM access/control. It is the single, shared
+implementation used by both the v1 (stdio) and v2 (streamable-http) engines;
+``paraview_mcp.v1`` and ``paraview_mcp.v2`` re-export ``ParaViewManager`` from
+here.
 """
 
 import importlib.util

@@ -16,7 +16,7 @@ Usage:
 from mcp.server.fastmcp import FastMCP, Image
 
 from paraview_mcp.logger import setup_logging
-from paraview_mcp.v1.paraview_manager import ParaViewManager
+from paraview_mcp.manager import ParaViewManager
 
 # Default prompt that instructs Claude how to interact with ParaView
 default_prompt = """

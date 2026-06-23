@@ -18,8 +18,8 @@ from logging import Logger
 from mcp.server.fastmcp import FastMCP, Image
 
 from paraview_mcp.logger import setup_logging
+from paraview_mcp.manager import ParaViewManager
 from paraview_mcp.v2 import MCP_SERVER_NAME
-from paraview_mcp.v2.paraview_manager import ParaViewManager
 
 LOGGER: Logger = setup_logging()
 

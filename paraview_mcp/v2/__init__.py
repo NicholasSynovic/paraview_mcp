@@ -2,7 +2,7 @@
 ParaView MCP - Model Context Protocol server for ParaView
 """
 
-from .paraview_manager import ParaViewManager
+from paraview_mcp.manager import ParaViewManager
 
 # Display name for the FastMCP server (see pv_mcp.py). Do NOT override the
 # module dunder ``__name__`` here: doing so breaks ``from paraview_mcp.v2
