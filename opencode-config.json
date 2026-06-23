@@ -10,9 +10,10 @@
             "type": "local",
             "command": [
                 "paraview-mcp",
-                "--server",
+                "v1",
+                "--paraview-server",
                 "localhost",
-                "--port",
+                "--paraview-port",
                 "11111"
             ]
         }

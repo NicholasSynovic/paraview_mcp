@@ -50,6 +50,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
 
+    ss_group = pv_parent.add_argument_group("Screenshot Compression Options")
+    ss_group.add_argument(
+        "--compress-screenshots",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Compress screenshots to reduce token usage (default: %(default)s)",
+    )
+    ss_group.add_argument(
+        "--max-screenshot-width",
+        type=int,
+        default=1280,
+        help=(
+            "Maximum screenshot width in pixels when compression is enabled "
+            "(default: %(default)s)"
+        ),
+    )
+    ss_group.add_argument(
+        "--screenshot-quality",
+        type=int,
+        default=85,
+        help=("JPEG quality 1-100 when compression is enabled (default: %(default)s)"),
+    )
+
     # 2. Define the main root parser
     parser = argparse.ArgumentParser(
         prog=__prog__,

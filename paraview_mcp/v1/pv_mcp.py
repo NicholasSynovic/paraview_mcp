@@ -33,25 +33,11 @@ When using ParaView through this interface, please follow these guidelines:
 
 logger = setup_logging()
 
-# Create the ParaView manager with configurable screenshot compression
-# Environment variables can override defaults:
-# - PARAVIEW_COMPRESS_SCREENSHOTS: "true"/"false" (default: true)
-# - PARAVIEW_MAX_SCREENSHOT_WIDTH: integer (default: 1280)
-# - PARAVIEW_SCREENSHOT_QUALITY: 1-100 (default: 85)
-
-import os
-
-compress_screenshots = (
-    os.environ.get("PARAVIEW_COMPRESS_SCREENSHOTS", "true").lower() == "true"
-)
-max_width = int(os.environ.get("PARAVIEW_MAX_SCREENSHOT_WIDTH", "1280"))
-quality = int(os.environ.get("PARAVIEW_SCREENSHOT_QUALITY", "85"))
-
-pv_manager = ParaViewManager(
-    compress_screenshots=compress_screenshots,
-    max_screenshot_width=max_width,
-    screenshot_quality=quality,
-)
+# The ParaView manager is constructed in ``run()`` so that screenshot
+# compression settings can be supplied from the CLI (see paraview_mcp.cli).
+# It is declared here as a module global because the @mcp.tool() functions
+# below reference it; it is populated before the MCP server starts serving.
+pv_manager = None
 
 # Initialize FastMCP server for Claude Desktop integration with default prompt
 mcp = FastMCP("ParaView", instructions=default_prompt)
@@ -1132,7 +1118,13 @@ def list_commands() -> str:
     return "Available ParaView commands:\n\n" + "\n".join(commands)
 
 
-def run(server: str = "localhost", port: int = 11111) -> None:
+def run(
+    server: str = "localhost",
+    port: int = 11111,
+    compress_screenshots: bool = True,
+    max_screenshot_width: int = 1280,
+    screenshot_quality: int = 85,
+) -> None:
     """
     Connect to ParaView and run the MCP server.
 
@@ -1143,7 +1135,20 @@ def run(server: str = "localhost", port: int = 11111) -> None:
     Args:
         server: ParaView server hostname.
         port: ParaView server port.
+        compress_screenshots: Whether to compress screenshots to reduce token
+            usage.
+        max_screenshot_width: Maximum screenshot width in pixels when
+            compression is enabled (height scales proportionally).
+        screenshot_quality: JPEG quality (1-100) when compression is enabled.
     """
+    # Construct the ParaView manager with the CLI-provided screenshot settings.
+    global pv_manager
+    pv_manager = ParaViewManager(
+        compress_screenshots=compress_screenshots,
+        max_screenshot_width=max_screenshot_width,
+        screenshot_quality=screenshot_quality,
+    )
+
     # Connect to ParaView
     pv_manager.connect(server, port)
 

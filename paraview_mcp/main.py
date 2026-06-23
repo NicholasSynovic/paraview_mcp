@@ -36,6 +36,9 @@ def main() -> None:
             pv_mcp.run(
                 server=args.paraview_server,
                 port=args.paraview_port,
+                compress_screenshots=args.compress_screenshots,
+                max_screenshot_width=args.max_screenshot_width,
+                screenshot_quality=args.screenshot_quality,
             )
         else:
             raise NotImplementedError(
