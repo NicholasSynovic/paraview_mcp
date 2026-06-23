@@ -6,23 +6,22 @@ ParaView MCP server: a FastMCP server that exposes `paraview.simple` operations 
 
 The package is split into a thin controller + a versioned engine. Do not look for tools in `main.py`.
 
-- `paraview_mcp/main.py` — thin controller for the `paraview-mcp` console script. Parses args, sets up logging, optionally `sys.path.append`s an external ParaView install, then calls `paraview_mcp.v1.pv_mcp.run()`. **Imports the server lazily inside `main()`** because importing it pulls in `paraview.simple`.
-- `paraview_mcp/cli.py` — argparse surface only (no ParaView import).
+- `paraview_mcp/main.py` — thin controller for the `paraview-mcp` console script. Parses args, sets up logging, optionally `sys.path.append`s an external ParaView install, then calls `paraview_mcp.v1.pv_mcp.run()`. **Imports the engine lazily inside `main()`** because importing it pulls in `paraview.simple`.
+- `paraview_mcp/cli.py` — argparse surface only (no ParaView import). Requires a `v1`/`v2` subcommand; shared flags live on the `pv_parent` parent parser, so `v1` and `v2` both inherit `--paraview-server`, `--paraview-port`, `--paraview-package-path`, and the screenshot flags (`--compress-screenshots/--no-compress-screenshots`, `--max-screenshot-width`, `--screenshot-quality`).
 - `paraview_mcp/logger.py` — `setup_logging()`; writes to `~/paraview_logs/paraview_mcp_external.log` (dir created on call). Idempotent.
-- `paraview_mcp/v1/pv_mcp.py` (~1160 lines) — **all `@mcp.tool()` definitions** + the module-level `mcp = FastMCP(...)`, `pv_manager`, and `run(server, port)`. The `default_prompt` string here is a **behavioral contract sent to the LLM** ("one function per reply", color-map tips). Editing tool docstrings/`default_prompt` changes model behavior.
-- `paraview_mcp/v1/paraview_manager.py` (~3000 lines) — single `ParaViewManager` class wrapping `paraview.simple`. All ParaView state lives here; `pv_mcp.py` is a thin tool shim.
-- `paraview_mcp/v2/` — empty placeholder package (a `v2` subcommand exists in the CLI but has no engine yet).
+- `paraview_mcp/v1/pv_mcp.py` (~1160 lines) — **all `@mcp.tool()` definitions** (43 tools) + the module-level `mcp = FastMCP(...)` and `run(...)`. `pv_manager` is module-global but set to `None` at import; `run()` constructs the `ParaViewManager` (so it can apply CLI screenshot settings) and reassigns it via `global pv_manager`. The `default_prompt` string is a **behavioral contract sent to the LLM** ("only call strictly necessary functions per reply", color-map tips). Editing tool docstrings/`default_prompt` changes model behavior.
+- `paraview_mcp/v1/paraview_manager.py` (~3090 lines) — single `ParaViewManager` class wrapping `paraview.simple`. All ParaView state lives here; `pv_mcp.py` is a thin tool shim.
+- `paraview_mcp/v2/` — **near-identical copy of v1** (same 43 tools, its own `paraview_manager.py` + `pv_mcp.py` with `run()`), but **not wired in**: `main.py` raises `NotImplementedError` for the `v2` engine. The CLI accepts `v2` and adds `--server`/`--port` (MCP transport, distinct from `--paraview-*`), but it cannot actually start. Edits to v1 must usually be mirrored into v2 to keep them from diverging.
 
 No tests, no CI (CONTRIBUTING.md mentions Travis but there is no CI config in the repo).
 
-## KNOWN BUG: CLI / main.py are out of sync
+## Entrypoint: keep cli.py / main.py / README in sync
 
-`cli.py` and `main.py` disagree on the argument namespace. Verify before trusting any run command:
+`cli.py`, `main.py`, and the README "Running"/integration sections must agree on the argument namespace (a past mismatch made `paraview-mcp v1` raise `AttributeError`). Current verified interface:
 
-- `cli.py` requires a subcommand (`v1` or `v2`) and produces `args.version`, `args.paraview_server`, `args.paraview_port` (v2 also adds `args.server`/`args.port`).
-- `main.py` reads `args.paraview_package_path`, `args.server`, `args.port` — **none of which `cli.py` produces for `v1`**. So `paraview-mcp v1` currently raises `AttributeError`, and the README's `paraview-mcp --server localhost --port 11111` form no longer parses.
-
-If you touch the entrypoint, reconcile these three (`cli.py`, `main.py`, README "Running" section) together. The README documents the _intended_ interface, not the current one.
+- Run with: `paraview-mcp v1 --paraview-server localhost --paraview-port 11111` (bare `paraview-mcp v1` works on defaults).
+- `main.py` reads `args.paraview_server`, `args.paraview_port`, `args.paraview_package_path`, `args.compress_screenshots`, `args.max_screenshot_width`, `args.screenshot_quality` — all produced by `cli.py`.
+- If you add/rename a CLI flag, update `cli.py`, the `pv_mcp.run()` signature, the `main.py` call, and every command/JSON snippet in `README.md` + `opencode-config.json` together. Verify with `python -c "from paraview_mcp.cli import parse_args; parse_args([...])"` (no ParaView needed).
 
 ## Environment & quirks
 
@@ -31,7 +30,7 @@ If you touch the entrypoint, reconcile these three (`cli.py`, `main.py`, README 
 - Python version signals disagree — trust the runtime constraint, not the files:
     - `.python-version` → `3.14`; `.pre-commit-config.yaml` → `python3.13`; `pyproject.toml` → `requires-python = ">=3.10"`; README → conda `python=3.10`.
     - **In practice the Python version is dictated by whatever the conda `paraview` package supports** (typically 3.10/3.11). Use that env to run the server; pre-commit may use a different interpreter.
-- External ParaView: pass `--paraview_package_path /path/to/site-packages` (note: see CLI bug above — this flag is referenced by `main.py` but not defined in `cli.py`).
+- External ParaView: pass `--paraview-package-path /path/to/site-packages` (defined on the shared parent parser; appended to `sys.path` in `main.py` before the engine import).
 
 ## Build / dev tooling
 

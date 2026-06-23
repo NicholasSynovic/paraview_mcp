@@ -40,6 +40,20 @@ def main() -> None:
                 max_screenshot_width=args.max_screenshot_width,
                 screenshot_quality=args.screenshot_quality,
             )
+        elif args.engine == "v2":
+            # Imported lazily, after sys.path is extended, because importing
+            # this module pulls in paraview.simple.
+            from paraview_mcp.v2 import pv_mcp
+
+            pv_mcp.run(
+                paraview_server=args.paraview_server,
+                paraview_port=args.paraview_port,
+                mcp_server=args.server,
+                mcp_port=args.port,
+                compress_screenshots=args.compress_screenshots,
+                max_screenshot_width=args.max_screenshot_width,
+                screenshot_quality=args.screenshot_quality,
+            )
         else:
             raise NotImplementedError(
                 f"The '{args.engine}' engine is not implemented yet."
