@@ -8,7 +8,7 @@ server is imported and run by ``paraview_mcp.main``.
 
 import argparse
 
-from paraview_mcp import __doi__, __prog__
+from paraview_mcp import __doi__, __prog__, __version__
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -20,7 +20,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     Returns:
         The parsed argument namespace. Depending on the chosen sub-command,
-        it will contain 'version' ("v1" or "v2") along with the version-specific
+        it will contain 'engine' ("v1" or "v2") along with the engine-specific
         arguments.
     """
     # 1. Define the shared parent parser for ParaView options
@@ -39,6 +39,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=11111,
         help="ParaView server port (default: %(default)s)",
     )
+    pv_group.add_argument(
+        "--paraview-package-path",
+        type=str,
+        default=None,
+        help=(
+            "Path to an external ParaView install's site-packages directory. "
+            "When set, it is appended to sys.path before importing "
+            "paraview.simple (default: %(default)s)"
+        ),
+    )
 
     # 2. Define the main root parser
     parser = argparse.ArgumentParser(
@@ -46,9 +56,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="ParaView External MCP Server",
         epilog=f"DOI: {__doi__}",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show the paraview-mcp version and exit",
+    )
 
     subparsers = parser.add_subparsers(
-        dest="version", required=True, help="API version to run"
+        dest="engine", required=True, help="ParaView MCP engine to run"
     )
 
     # =========================================================================
@@ -72,13 +88,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--server",
         type=str,
         default="localhost",
-        help="MCP server hostname (default: %(default)s)",
+        help=(
+            "MCP server bind hostname (transport), distinct from "
+            "--paraview-server (default: %(default)s)"
+        ),
     )
     v2_mcp_group.add_argument(
         "--port",
         type=int,
         default=8080,
-        help="MCP port (default: %(default)s)",
+        help=(
+            "MCP server bind port (transport), distinct from "
+            "--paraview-port (default: %(default)s)"
+        ),
     )
 
     return parser.parse_args(argv)

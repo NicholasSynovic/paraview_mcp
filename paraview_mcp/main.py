@@ -15,7 +15,6 @@ import sys
 
 from paraview_mcp.cli import parse_args
 from paraview_mcp.logger import setup_logging
-from paraview_mcp.v1 import pv_mcp
 
 
 def main() -> None:
@@ -24,12 +23,24 @@ def main() -> None:
     logger = setup_logging()
 
     # Make an external ParaView install importable before importing the
-    # server module (which imports paraview.simple at import time).
+    # engine module (which imports paraview.simple at import time).
     if args.paraview_package_path:
         sys.path.append(args.paraview_package_path)
 
     try:
-        pv_mcp.run(server=args.server, port=args.port)
+        if args.engine == "v1":
+            # Imported lazily, after sys.path is extended, because importing
+            # this module pulls in paraview.simple.
+            from paraview_mcp.v1 import pv_mcp
+
+            pv_mcp.run(
+                server=args.paraview_server,
+                port=args.paraview_port,
+            )
+        else:
+            raise NotImplementedError(
+                f"The '{args.engine}' engine is not implemented yet."
+            )
     except Exception as e:  # pragma: no cover - top-level safety net
         logger.error(f"Fatal error starting ParaView MCP server: {str(e)}")
         raise
