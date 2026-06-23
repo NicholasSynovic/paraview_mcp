@@ -94,6 +94,26 @@ paraview-mcp v1 --paraview-server localhost --paraview-port 11111
 
 `--paraview-server` (default `localhost`) and `--paraview-port` (default `11111`) select the `pvserver` to connect to, so the bare `paraview-mcp v1` form works against a default local server.
 
+### V2 engine (streamable-http transport)
+
+The `v2` engine exposes the same tools as `v1` but serves them over the MCP
+**streamable-http** transport instead of stdio. This lets a remote MCP client
+connect to a long-running server over the network.
+
+```bash
+paraview-mcp v2 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+```
+
+The two address pairs are distinct:
+
+| Flag                                    | Default               | Description                                             |
+| --------------------------------------- | --------------------- | ------------------------------------------------------- |
+| `--paraview-server` / `--paraview-port` | `localhost` / `11111` | The `pvserver` the engine connects to.                  |
+| `--server` / `--port`                   | `localhost` / `8080`  | The address the MCP streamable-http transport binds to. |
+
+The streamable-http endpoint is served at `http://<server>:<port>/mcp`. Point a
+remote-capable MCP client at that URL (see the OpenCode example below).
+
 ### External ParaView install
 
 If ParaView is installed outside the active conda env (e.g., a system or custom build), point the server at its site-packages:
@@ -145,6 +165,21 @@ Or use the provided config like so:
 
 ```bash
 OPENCODE_CONFIG=opencode-config.json opencode
+```
+
+To use the `v2` engine instead, start the server separately
+(`paraview-mcp v2 --server localhost --port 8080`) and register it as a
+`remote` MCP pointing at the streamable-http endpoint:
+
+```json
+{
+    "mcp": {
+        "paraview": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp"
+        }
+    }
+}
 ```
 
 ## Integration: Claude Code

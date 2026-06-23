@@ -18,7 +18,7 @@ from logging import Logger
 from mcp.server.fastmcp import FastMCP, Image
 
 from paraview_mcp.logger import setup_logging
-from paraview_mcp.v2 import __name__
+from paraview_mcp.v2 import MCP_SERVER_NAME
 from paraview_mcp.v2.paraview_manager import ParaViewManager
 
 LOGGER: Logger = setup_logging()
@@ -42,7 +42,7 @@ When using ParaView through this interface, please follow these guidelines:
 
 # Initialize FastMCP server for Claude Desktop integration with default prompt
 mcp: FastMCP = FastMCP(
-    name=__name__,
+    name=MCP_SERVER_NAME,
     instructions=default_prompt,
 )
 
