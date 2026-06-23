@@ -42,8 +42,16 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["paraview_mcp"]
 
-[tool.black]
+[tool.ruff]
+# Line length follows .editorconfig (and the former [tool.black] setting).
 line-length = 80
+
+[tool.ruff.lint]
+# F403/F405: `from paraview.simple import *` is intentional and load-bearing
+# (dozens of ParaView symbols are only available via the star import), so the
+# "may be undefined" warnings it triggers are ignored project-wide. E722 (bare
+# except) is addressed in code, not ignored here.
+ignore = ["F403", "F405"]
 
 
 [dependency-groups]
