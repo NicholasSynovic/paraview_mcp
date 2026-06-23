@@ -158,17 +158,58 @@ Open ParaView → **File → Connect** → add a server at `localhost:11111` →
 
 **3. Start the MCP server**:
 
+`paraview-mcp` requires an engine subcommand (`v1` or `v2`). Use `v1` for the current engine:
+
 ```bash
-paraview-mcp --server localhost --port 11111
+paraview-mcp v1 --paraview-server localhost --paraview-port 11111
 ```
+
+`--paraview-server` (default `localhost`) and `--paraview-port` (default `11111`) select the `pvserver` to connect to, so the bare `paraview-mcp v1` form works against a default local server.
+
+### V2 engine (streamable-http transport)
+
+The `v2` engine exposes the same tools as `v1` but serves them over the MCP
+**streamable-http** transport instead of stdio. This lets a remote MCP client
+connect to a long-running server over the network.
+
+```bash
+paraview-mcp v2 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+```
+
+The two address pairs are distinct:
+
+| Flag                                    | Default               | Description                                             |
+| --------------------------------------- | --------------------- | ------------------------------------------------------- |
+| `--paraview-server` / `--paraview-port` | `localhost` / `11111` | The `pvserver` the engine connects to.                  |
+| `--server` / `--port`                   | `localhost` / `8080`  | The address the MCP streamable-http transport binds to. |
+
+The streamable-http endpoint is served at `http://<server>:<port>/mcp`. Point a
+remote-capable MCP client at that URL (see the OpenCode example below).
 
 ### External ParaView install
 
 If ParaView is installed outside the active conda env (e.g., a system or custom build), point the server at its site-packages:
 
 ```bash
-paraview-mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
+paraview-mcp v1 --paraview-package-path /opt/paraview/lib/python3.x/site-packages
 ```
+
+### Screenshot compression
+
+Screenshots returned by `get_screenshot` are compressed by default to reduce LLM token usage. The defaults can be configured with global CLI flags (available on every engine subcommand):
+
+```bash
+paraview-mcp v1 --no-compress-screenshots
+paraview-mcp v1 --max-screenshot-width 1920 --screenshot-quality 70
+```
+
+| Flag                                                   | Default    | Description                                                        |
+| ------------------------------------------------------ | ---------- | ------------------------------------------------------------------ |
+| `--compress-screenshots` / `--no-compress-screenshots` | `compress` | Toggle JPEG screenshot compression.                                |
+| `--max-screenshot-width`                               | `1280`     | Maximum screenshot width in pixels (height scales proportionally). |
+| `--screenshot-quality`                                 | `85`       | JPEG quality (1-100) when compression is enabled.                  |
+
+These set the startup defaults; they can still be overridden at runtime via the `configure_screenshot_compression` tool.
 
 ## Integration: OpenCode
 
@@ -181,9 +222,10 @@ Add the following to `~/.config/opencode/opencode.json`:
             "type": "local",
             "command": [
                 "paraview-mcp",
-                "--server",
+                "v1",
+                "--paraview-server",
                 "localhost",
-                "--port",
+                "--paraview-port",
                 "11111"
             ]
         }
@@ -197,6 +239,21 @@ Or use the provided config like so:
 OPENCODE_CONFIG=opencode-config.json opencode
 ```
 
+To use the `v2` engine instead, start the server separately
+(`paraview-mcp v2 --server localhost --port 8080`) and register it as a
+`remote` MCP pointing at the streamable-http endpoint:
+
+```json
+{
+    "mcp": {
+        "paraview": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp"
+        }
+    }
+}
+```
+
 ## Integration: Claude Code
 
 Add the following to `.mcp.json` in your project root (or `~/.claude/mcp.json` for a global config):
@@ -206,7 +263,13 @@ Add the following to `.mcp.json` in your project root (or `~/.claude/mcp.json` f
     "mcpServers": {
         "paraview": {
             "command": "paraview-mcp",
-            "args": ["--server", "localhost", "--port", "11111"]
+            "args": [
+                "v1",
+                "--paraview-server",
+                "localhost",
+                "--paraview-port",
+                "11111"
+            ]
         }
     }
 }
@@ -221,7 +284,13 @@ Add the following block to `claude_desktop_config.json`:
     "mcpServers": {
         "ParaView": {
             "command": "paraview-mcp",
-            "args": ["--server", "localhost", "--port", "11111"]
+            "args": [
+                "v1",
+                "--paraview-server",
+                "localhost",
+                "--paraview-port",
+                "11111"
+            ]
         }
     }
 }
@@ -229,7 +298,7 @@ Add the following block to `claude_desktop_config.json`:
 
 ## MCP Tool Reference
 
-All tools are defined in `paraview_mcp/main.py` as `@mcp.tool()` functions and delegate to `ParaViewManager` methods. Use `list_commands` to discover them at runtime.
+All tools are defined in `paraview_mcp/v1/pv_mcp.py` as `@mcp.tool()` functions and delegate to `ParaViewManager` methods. Use `list_commands` to discover them at runtime.
 
 ### Connection
 
@@ -300,7 +369,7 @@ Use `make freeze` and verify the result as described in [Updating `environment.y
 
 **1. `ModuleNotFoundError: No module named 'paraview'`**
 
-`paraview` is only installable via conda, not pip. Activate the conda env (`conda activate paraview_mcp`) before running `paraview-mcp`. Alternatively, if ParaView is installed outside the env, pass `--paraview_package_path /path/to/site-packages`.
+`paraview` is only installable via conda, not pip. Activate the conda env (`conda activate paraview_mcp`) before running `paraview-mcp`. Alternatively, if ParaView is installed outside the env, pass `--paraview-package-path /path/to/site-packages`.
 
 **2. `ConnectionRefusedError` on port 11111**
 

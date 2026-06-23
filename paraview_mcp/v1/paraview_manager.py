@@ -1,5 +1,5 @@
 """
-ParaView MCP Server
+ParaView Instance Manager
 
 This class encapsulates paraview.simple API to expose a higher-level API that is compatible with LLM access/control.
 """

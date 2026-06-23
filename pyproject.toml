@@ -1,6 +1,6 @@
 [project]
 name = "paraview-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server exposing ParaView operations as tools for LLM-driven visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,7 @@ classifiers = [
 # Note: 'paraview' is intentionally omitted — it is only installable via conda
 # (conda-forge::paraview) and cannot be pip-installed.
 dependencies = [
+    "fastmcp>=2.9.2",
     "httpx==0.28.1",
     "mcp[cli]==1.9.4",
 ]

@@ -7,14 +7,9 @@
     },
     "mcp": {
         "paraview": {
-            "type": "local",
-            "command": [
-                "paraview-mcp",
-                "--server",
-                "localhost",
-                "--port",
-                "11111"
-            ]
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
+            "enabled": true
         }
     }
 }
