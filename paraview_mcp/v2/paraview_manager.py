@@ -24,10 +24,10 @@ class ParaViewManager:
 
     def __init__(
         self,
-        compress_screenshots=True,
-        max_screenshot_width=1280,
-        screenshot_quality=85,
-    ):
+        compress_screenshots: bool = True,
+        max_screenshot_width: int = 1280,
+        screenshot_quality: int = 85,
+    ) -> None:
         """
         Initialize the ParaView manager
 
@@ -54,7 +54,7 @@ class ParaViewManager:
             f"ParaViewManager initialized with screenshot compression: {compress_screenshots}"
         )
 
-    def _get_source_name(self, proxy):
+    def _get_source_name(self, proxy) -> str:
         """
         Get the name (registered name) of a source proxy.
 
@@ -80,7 +80,7 @@ class ParaViewManager:
             self.logger.error(f"Error getting source name: {str(e)}")
             return ""
 
-    def connect(self, server_url="localhost", port=11111):
+    def connect(self, server_url: str = "localhost", port: int = 11111) -> bool:
         """
         Connect to a running ParaView server
 
@@ -114,7 +114,7 @@ class ParaViewManager:
             self.logger.error(f"Failed to connect to ParaView: {str(e)}")
             return False
 
-    def load_data(self, file_path):
+    def load_data(self, file_path: str) -> tuple[bool, str, object | None, str]:
         """
         Load data from a file into ParaView
 
@@ -237,12 +237,12 @@ class ParaViewManager:
 
     def _configure_raw_reader(
         self,
-        file_path,
-        file_name,
-        dimensions=None,
-        data_type=None,
-        byte_order=None,
-        num_components=None,
+        file_path: str,
+        file_name: str,
+        dimensions: list | None = None,
+        data_type: str | None = None,
+        byte_order: str | None = None,
+        num_components: int | None = None,
     ):
         """
         Configure a reader for RAW volume files
@@ -336,13 +336,13 @@ class ParaViewManager:
 
     def load_raw_data(
         self,
-        file_path,
-        dimensions,
-        data_type,
-        byte_order="LittleEndian",
-        spacing=(1, 1, 1),
-        num_components=1,
-    ):
+        file_path: str,
+        dimensions: list,
+        data_type: str,
+        byte_order: str = "LittleEndian",
+        spacing: tuple = (1, 1, 1),
+        num_components: int = 1,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Load RAW data from a file with explicit parameters
 
@@ -465,7 +465,7 @@ class ParaViewManager:
             self.logger.error(f"Error loading RAW data: {str(e)}")
             return False, f"Error loading RAW data: {str(e)}", None, ""
 
-    def clear_pipeline_and_reset(self):
+    def clear_pipeline_and_reset(self) -> tuple[bool, str]:
         """
         Completely clear the ParaView pipeline and return the GUI to a clean,
         freshly-started state.
@@ -610,7 +610,9 @@ class ParaViewManager:
             self.logger.error(error_msg)
             return False, error_msg
 
-    def set_background_color(self, red=0.32, green=0.34, blue=0.43):
+    def set_background_color(
+        self, red: float = 0.32, green: float = 0.34, blue: float = 0.43
+    ) -> tuple[bool, str]:
         """
         Set the background color of the active view.
 
@@ -659,7 +661,9 @@ class ParaViewManager:
             self.logger.error(f"Error setting background color: {str(e)}")
             return False, f"Error setting background color: {str(e)}"
 
-    def save_contour_as_stl(self, stl_filename="contour.stl"):
+    def save_contour_as_stl(
+        self, stl_filename: str = "contour.stl"
+    ) -> tuple[bool, str, str]:
         """
         Save the active source (e.g. a contour) as an STL file in the same folder
         where the original data was loaded.
@@ -712,7 +716,9 @@ class ParaViewManager:
             self.logger.error(f"Error saving STL: {str(e)}")
             return False, f"Error saving STL: {str(e)}", ""
 
-    def create_source(self, source_type):
+    def create_source(
+        self, source_type: str
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create a new geometric source
 
@@ -757,7 +763,7 @@ class ParaViewManager:
             self.logger.error(f"Error creating source: {str(e)}")
             return False, f"Error creating source: {str(e)}", None, ""
 
-    def set_active_source(self, name):
+    def set_active_source(self, name: str) -> tuple[bool, str]:
         """
         Set the active pipeline object by matching its registered name. Use this function to set active source so that the computation is applied to the correct objects in paraview object hiearchy.
 
@@ -792,7 +798,9 @@ class ParaViewManager:
             self.logger.error(f"Error in set_active_source: {str(e)}")
             return False, f"Error setting active source: {str(e)}"
 
-    def get_active_source_names_by_type(self, source_type=None):
+    def get_active_source_names_by_type(
+        self, source_type: str | None = None
+    ) -> tuple[bool, str, list]:
         """
         Get a list of source names filtered by their type.
 
@@ -837,7 +845,9 @@ class ParaViewManager:
             self.logger.error(f"Error getting source names by type: {str(e)}")
             return False, f"Error getting source names by type: {str(e)}", []
 
-    def create_isosurface(self, value, field=None):
+    def create_isosurface(
+        self, value: float, field: str | None = None
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create or update an isosurface visualization of the loaded volume data.
         If an isosurface filter already exists (stored in self.isosurface_filter),
@@ -898,7 +908,7 @@ class ParaViewManager:
                 "",
             )
 
-    def compute_surface_area(self):
+    def compute_surface_area(self) -> tuple[bool, str, float]:
         """
         Compute the surface area of the ACTIVE source.
 
@@ -961,14 +971,14 @@ class ParaViewManager:
 
     def create_clip(
         self,
-        origin_x=None,
-        origin_y=None,
-        origin_z=None,
-        normal_x=1,
-        normal_y=0,
-        normal_z=0,
-        invert=False,
-    ):
+        origin_x: float | None = None,
+        origin_y: float | None = None,
+        origin_z: float | None = None,
+        normal_x: float = 1,
+        normal_y: float = 0,
+        normal_z: float = 0,
+        invert: bool = False,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create a clip filter to cut the data with a plane.
 
@@ -1043,13 +1053,13 @@ class ParaViewManager:
 
     def create_slice(
         self,
-        origin_x=None,
-        origin_y=None,
-        origin_z=None,
-        normal_x=0,
-        normal_y=0,
-        normal_z=1,
-    ):
+        origin_x: float | None = None,
+        origin_y: float | None = None,
+        origin_z: float | None = None,
+        normal_x: float = 0,
+        normal_y: float = 0,
+        normal_z: float = 1,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create a slice through the loaded volume data.
 
@@ -1115,7 +1125,9 @@ class ParaViewManager:
             self.logger.error(f"Error creating slice: {str(e)}")
             return False, f"Error creating slice: {str(e)}", None, None
 
-    def create_volume_rendering(self, enable=True):
+    def create_volume_rendering(
+        self, enable: bool = True
+    ) -> tuple[bool, str, str]:
         """
         Toggle volume rendering for the loaded volume data.
 
@@ -1175,7 +1187,9 @@ class ParaViewManager:
             self.logger.error(f"Error toggling volume rendering: {str(e)}")
             return False, f"Error toggling volume rendering: {str(e)}", None
 
-    def toggle_visibility(self, enable=True):
+    def toggle_visibility(
+        self, enable: bool = True
+    ) -> tuple[bool, str, object | None]:
         """
         Toggle visibility for the current source.
 
@@ -1210,7 +1224,7 @@ class ParaViewManager:
             self.logger.error(f"Error toggling visibility: {str(e)}")
             return False, f"Error toggling visibility: {str(e)}", None
 
-    def color_by(self, field, component=-1):
+    def color_by(self, field: str, component: int = -1) -> tuple[bool, str]:
         """
         Color the active visualization by a specific field.
         This function first checks if the active source can be colored by fields
@@ -1346,7 +1360,12 @@ class ParaViewManager:
     #         self.logger.error(f"Error setting color map: {str(e)}")
     #         return False, f"Error setting color map: {str(e)}"
 
-    def get_histogram(self, field=None, num_bins=256, data_location="POINTS"):
+    def get_histogram(
+        self,
+        field: str | None = None,
+        num_bins: int = 256,
+        data_location: str = "POINTS",
+    ) -> tuple[bool, str, list]:
         """
         Compute and retrieve histogram data for a field in the active data source.
         This function is designed to work with volume sources. By default it uses the
@@ -1453,7 +1472,7 @@ class ParaViewManager:
             self.logger.error(f"Error computing histogram: {str(e)}")
             return False, f"Error computing histogram: {str(e)}", None
 
-    def set_representation_type(self, rep_type):
+    def set_representation_type(self, rep_type: str) -> tuple[bool, str]:
         """
         Set the representation type for the active source.
 
@@ -1478,7 +1497,9 @@ class ParaViewManager:
             self.logger.error(f"Error setting representation type: {str(e)}")
             return False, f"Error setting representation type: {str(e)}"
 
-    def edit_volume_opacity(self, field_name, opacity_points):
+    def edit_volume_opacity(
+        self, field_name: str, opacity_points: list
+    ) -> tuple[bool, str]:
         """
         Edit ONLY the opacity transfer function for a given field, ensuring
         we pass only (value, alpha) pairs to ParaView.
@@ -1525,7 +1546,9 @@ class ParaViewManager:
             )
             return False, f"Error editing opacity transfer function: {str(e)}"
 
-    def set_color_map(self, field_name, color_points):
+    def set_color_map(
+        self, field_name: str, color_points: list
+    ) -> tuple[bool, str]:
         """
         Sets the color transfer function for the given field (array) in ParaView.
 
@@ -1576,7 +1599,7 @@ class ParaViewManager:
             msg = f"Error setting color map: {str(e)}"
             return False, msg
 
-    def get_pipeline(self):
+    def get_pipeline(self) -> tuple[bool, str]:
         """
         Get the current pipeline structure.
 
@@ -1596,7 +1619,7 @@ class ParaViewManager:
             self.logger.error(f"Error getting pipeline: {str(e)}")
             return False, f"Error getting pipeline: {str(e)}"
 
-    def get_available_arrays(self):
+    def get_available_arrays(self) -> tuple[bool, str]:
         """
         Get a list of available arrays in the active source.
 
@@ -1646,17 +1669,17 @@ class ParaViewManager:
 
     def create_stream_tracer(
         self,
-        vector_field=None,
+        vector_field: str | None = None,
         base_source=None,
-        point_center=None,
-        integration_direction="BOTH",
-        initial_step_length=0.1,
-        maximum_stream_length=50.0,
-        number_of_streamlines=100,
-        point_radius=1.0,
-        tube_radius=0.1,
-        make_volume_transparent=True,
-    ):
+        point_center: list | None = None,
+        integration_direction: str = "BOTH",
+        initial_step_length: float = 0.1,
+        maximum_stream_length: float = 50.0,
+        number_of_streamlines: int = 100,
+        point_radius: float = 1.0,
+        tube_radius: float = 0.1,
+        make_volume_transparent: bool = True,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create a stream tracer visualization for a vector volume with tube representation.
 
@@ -1806,7 +1829,7 @@ class ParaViewManager:
             self.logger.error(f"Error creating stream tracer: {str(e)}")
             return False, f"Error creating stream tracer: {str(e)}", None, ""
 
-    def get_screenshot(self):
+    def get_screenshot(self) -> tuple[bool, str, str]:
         """
         Capture a screenshot from the current view with optional compression.
 
@@ -1948,7 +1971,9 @@ class ParaViewManager:
             self.logger.error(f"Error getting screenshot: {str(e)}")
             return False, f"Error getting screenshot: {str(e)}", None
 
-    def rotate_camera(self, azimuth=30.0, elevation=0.0):
+    def rotate_camera(
+        self, azimuth: float = 30.0, elevation: float = 0.0
+    ) -> tuple[bool, str]:
         """
         Rotate the camera by specified angles.
 
@@ -1975,7 +2000,9 @@ class ParaViewManager:
             self.logger.error(f"Error rotating camera: {str(e)}")
             return False, f"Error rotating camera: {str(e)}"
 
-    def reset_colormaps(self, array_name=None):
+    def reset_colormaps(
+        self, array_name: str | None = None
+    ) -> tuple[bool, str]:
         """
         Reset colormaps and transfer functions to default settings.
 
@@ -2190,7 +2217,7 @@ class ParaViewManager:
             self.logger.error(f"Error in reset_colormaps: {str(e)}")
             return False, f"Error in reset_colormaps: {str(e)}"
 
-    def reset_camera(self, padding_factor=1.0):
+    def reset_camera(self, padding_factor: float = 1.0) -> tuple[bool, str]:
         """
         Reset the camera to show all data with optional padding for better framing.
 
@@ -2248,7 +2275,12 @@ class ParaViewManager:
             self.logger.error(f"Error resetting camera: {str(e)}")
             return False, f"Error resetting camera: {str(e)}"
 
-    def plot_over_line(self, point1=None, point2=None, resolution=100):
+    def plot_over_line(
+        self,
+        point1: list | None = None,
+        point2: list | None = None,
+        resolution: int = 100,
+    ) -> tuple[bool, str, object | None]:
         """
         Create a 'Plot Over Line' filter to sample data along a line between two points.
 
@@ -2292,7 +2324,9 @@ class ParaViewManager:
             self.logger.error(f"Error creating plot over line: {str(e)}")
             return False, f"Error creating plot over line: {str(e)}", None
 
-    def warp_by_vector(self, vector_field=None, scale_factor=1.0):
+    def warp_by_vector(
+        self, vector_field: str | None = None, scale_factor: float = 1.0
+    ) -> tuple[bool, str, object | None]:
         """
         Apply the 'Warp By Vector' filter to the active source.
 
@@ -2345,7 +2379,9 @@ class ParaViewManager:
             self.logger.error(f"Error creating warp by vector: {str(e)}")
             return False, f"Error creating warp by vector: {str(e)}", None
 
-    def create_delaunay3d(self, alpha=0.0, offset=2.0, tolerance=0.001):
+    def create_delaunay3d(
+        self, alpha: float = 0.0, offset: float = 2.0, tolerance: float = 0.001
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create a 3D Delaunay triangulation of the active dataset.
 
@@ -2414,13 +2450,13 @@ class ParaViewManager:
 
     def filter_data(
         self,
-        filter_type="threshold",
-        field_name=None,
-        min_value=None,
-        max_value=None,
-        invert=False,
-        all_points=False,
-    ):
+        filter_type: str = "threshold",
+        field_name: str | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        invert: bool = False,
+        all_points: bool = False,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Apply data filtering operations including threshold and selection extraction.
         Combines threshold and extract selection functionality into a single versatile filter.
@@ -2533,8 +2569,11 @@ class ParaViewManager:
             return False, f"Error applying data filter: {str(e)}", None, ""
 
     def calculate_field(
-        self, result_name, expression, attribute_mode="Point Data"
-    ):
+        self,
+        result_name: str,
+        expression: str,
+        attribute_mode: str = "Point Data",
+    ) -> tuple[bool, str, object | None, str]:
         """
         Apply mathematical calculations to create new data fields.
         Combines calculator functionality with support for common mathematical operations.
@@ -2583,17 +2622,17 @@ class ParaViewManager:
 
     def transform_data(
         self,
-        operation="translate",
-        translate_x=0.0,
-        translate_y=0.0,
-        translate_z=0.0,
-        rotate_x=0.0,
-        rotate_y=0.0,
-        rotate_z=0.0,
-        scale_x=1.0,
-        scale_y=1.0,
-        scale_z=1.0,
-    ):
+        operation: str = "translate",
+        translate_x: float = 0.0,
+        translate_y: float = 0.0,
+        translate_z: float = 0.0,
+        rotate_x: float = 0.0,
+        rotate_y: float = 0.0,
+        rotate_z: float = 0.0,
+        scale_x: float = 1.0,
+        scale_y: float = 1.0,
+        scale_z: float = 1.0,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Apply geometric transformations to datasets.
         Combines translation, rotation, and scaling into a single versatile transform operation.
@@ -2684,14 +2723,14 @@ class ParaViewManager:
 
     def create_vector_visualization(
         self,
-        glyph_type="arrow",
-        vector_field=None,
-        scale_factor=None,
-        scale_mode="vector",
-        max_number_of_glyphs=5000,
-        auto_scale=True,
-        scale_percentage=0.01,
-    ):
+        glyph_type: str = "arrow",
+        vector_field: str | None = None,
+        scale_factor: float | None = None,
+        scale_mode: str = "vector",
+        max_number_of_glyphs: int = 5000,
+        auto_scale: bool = True,
+        scale_percentage: float = 0.01,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Create vector field visualizations using glyphs.
         Combines glyph functionality for arrows, cones, spheres to visualize vector data.
@@ -2821,12 +2860,12 @@ class ParaViewManager:
 
     def analyze_field_data(
         self,
-        analysis_type="gradient",
-        field_name=None,
-        compute_vorticity=False,
-        compute_divergence=False,
-        compute_qcriterion=False,
-    ):
+        analysis_type: str = "gradient",
+        field_name: str | None = None,
+        compute_vorticity: bool = False,
+        compute_divergence: bool = False,
+        compute_qcriterion: bool = False,
+    ) -> tuple[bool, str, object | None, str]:
         """
         Analyze field data including gradients, derivatives, and connectivity.
         Combines gradient computation and connectivity analysis into a unified interface.
@@ -2940,8 +2979,11 @@ class ParaViewManager:
             return False, f"Error analyzing field data: {str(e)}", None, ""
 
     def export_data(
-        self, export_format="csv", filename=None, export_type="all"
-    ):
+        self,
+        export_format: str = "csv",
+        filename: str | None = None,
+        export_type: str = "all",
+    ) -> tuple[bool, str, str]:
         """
         Export data in various formats with enhanced capabilities.
         Combines multiple export formats into a single versatile function.
