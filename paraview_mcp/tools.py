@@ -1096,43 +1096,18 @@ def list_commands() -> str:
     Returns:
         List of available commands
     """
-    commands = [
-        "load_data: Load data from a file",
-        "create_source: Create a geometric source (Sphere, Cone, etc.)",
-        "create_isosurface: Create an isosurface visualization",
-        "create_clip: Create a clip filter to cut data with a plane",
-        "create_slice: Create a slice through the data",
-        "create_delaunay3d: Create a 3D Delaunay triangulation of the dataset",
-        "filter_data: Apply threshold and data selection filters",
-        "calculate_field: Create new fields with mathematical expressions",
-        "transform_data: Apply geometric transformations (translate/rotate/scale)",
-        "create_vector_visualization: Visualize vector fields with glyphs (arrows/cones)",
-        "analyze_field_data: Compute gradients, connectivity analysis",
-        "export_data: Export data in multiple formats (CSV, VTK, STL, etc.)",
-        "clear_pipeline_and_reset: Clear all pipeline objects and reset to fresh state",
-        "set_background_color: Set the background color of the view",
-        "toggle_volume_rendering: Enable or disable volume rendering",
-        "toggle_visibility: Enable or disable visibility for the active source",
-        "set_active_source: Set the active pipeline object by name",
-        "get_active_source_names_by_type: Get a list of sources filtered by type",
-        "color_by: Color the visualization by a field",
-        # "set_color_map_preset: Set the color map preset",
-        "set_color_map: Set custom color transfer function for volume rendering",
-        "set_representation_type: Set the representation type (Surface, Wireframe, etc.)",
-        "edit_volume_opacity: Edit the opacity transfer function",
-        "get_pipeline: Get the current pipeline structure",
-        "get_available_arrays: Get available data arrays",
-        "get_histogram: Compute histogram for a data field",
-        "create_streamline: Create stream line visualization with tubes",
-        "compute_surface_area: Compute the surface area of the active surface",
-        "save_contour_as_stl: Save the active surface as STL",
-        "get_screenshot: Capture a screenshot and display it in chat",
-        "rotate_camera: Rotate the camera view",
-        "reset_camera: Reset the camera to show all data",
-        "plot_over_line: Create a plot over line filter",
-        "warp_by_vector: Warp the active source by a vector field",
-        "save_paraview_state: Save the current ParaView state to a file",
-        "save_txt_file: Save text content to a file",
-    ]
+    # Generate the list directly from the registered tools so it can never
+    # drift out of sync with the actual @mcp.tool() set. Each line is
+    # "<tool name>: <first sentence of its docstring>".
+    commands = []
+    for tool in mcp._tool_manager.list_tools():
+        summary = ""
+        for line in (tool.description or "").splitlines():
+            line = line.strip()
+            if line:
+                summary = line
+                break
+        commands.append(f"{tool.name}: {summary}" if summary else tool.name)
 
+    commands.sort()
     return "Available ParaView commands:\n\n" + "\n".join(commands)
