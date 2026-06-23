@@ -298,7 +298,7 @@ Add the following block to `claude_desktop_config.json`:
 
 ## MCP Tool Reference
 
-All tools are defined in `paraview_mcp/v1/pv_mcp.py` as `@mcp.tool()` functions and delegate to `ParaViewManager` methods. Use `list_commands` to discover them at runtime.
+All tools are defined once in `paraview_mcp/tools.py` as `@mcp.tool()` functions and delegate to `ParaViewManager` methods. Both the v1 (stdio) and v2 (streamable-http) engines import the same `mcp` instance and tool set from that module; `paraview_mcp/v1/pv_mcp.py` and `paraview_mcp/v2/pv_mcp.py` are thin `run()` shims that differ only in transport. Use `list_commands` to discover them at runtime (it is generated from the registered tools, so it never drifts).
 
 ### Connection
 

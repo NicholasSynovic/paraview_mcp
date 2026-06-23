@@ -1,34 +1,35 @@
 # AGENTS.md
 
-<<<<<<< HEAD
-FastMCP server that exposes `paraview.simple` as MCP tools so an LLM client (Claude Desktop, OpenCode, etc.) can drive a live ParaView session over `pvserver`.
-=======
 ParaView MCP server: a FastMCP server that exposes `paraview.simple` operations as MCP tools so an LLM client (Claude Desktop, OpenCode, etc.) can drive a live ParaView session over `pvserver`.
-
-> > > > > > > dev
 
 ## Package layout (the non-obvious bits)
 
-<<<<<<< HEAD
+The package is a thin controller + a single shared engine. The MCP tools and the `ParaViewManager` each live in exactly one place; the `v1`/`v2` packages are thin transport shims around them. Do **not** look for tool definitions in `main.py` or in the version packages.
 
-- `paraview_mcp/main.py` — FastMCP entrypoint. Defines every `@mcp.tool()` and instantiates one module-level `ParaViewManager`. The `default_prompt` string (line ~37) is a **behavioral contract sent to the LLM** ("one function per reply", color-map tips, etc.). Editing tool docstrings/wording changes model behavior.
-- `paraview_mcp/paraview_manager.py` (~3100 lines) — single class wrapping `paraview.simple`. All ParaView state lives here; `main.py` is a thin tool shim. It does `from paraview.simple import *` — do **not** "fix" the star import; dozens of symbols depend on it.
-- `paraview_mcp/__init__.py` re-exports `ParaViewManager` via relative import, but `main.py` itself uses a bare `from paraview_manager import ParaViewManager` (not `from .paraview_manager`). Works only because the package directory ends up on `sys.path` at runtime. Keep this in mind before "fixing" the import — past upstream merges have reverted such cleanups.
-- No tests, no CI workflows. `data/` holds a couple of demo datasets (`tooth_*.raw`, `wavelet_benchmark.vti`).
+- `paraview_mcp/main.py` — thin controller for the `paraview-mcp` console script. Parses args, sets up logging, optionally `sys.path.append`s an external ParaView install, then calls the selected engine's `run()` (`paraview_mcp.v1.pv_mcp.run()` or `paraview_mcp.v2.pv_mcp.run()`). **Imports the engine lazily inside `main()`** because importing it pulls in `paraview.simple`.
+- `paraview_mcp/cli.py` — argparse surface only (no ParaView import). Requires a `v1`/`v2` subcommand; shared flags live on the `pv_parent` parent parser, so `v1` and `v2` both inherit `--paraview-server`, `--paraview-port`, `--paraview-package-path`, and the screenshot flags (`--compress-screenshots/--no-compress-screenshots`, `--max-screenshot-width`, `--screenshot-quality`). `v2` additionally defines `--server`/`--port` for the MCP transport bind address.
+- `paraview_mcp/logger.py` — `setup_logging()`; writes to `~/paraview_logs/paraview_mcp_external.log` (dir created on call). Idempotent.
+- `paraview_mcp/tools.py` (~1110 lines) — **the single source for all `@mcp.tool()` definitions** (39 registered tools) plus the module-level `mcp = FastMCP(...)`, the `default_prompt`, the `pv_manager` module global, `set_pv_manager()`, and `list_commands()`. `pv_manager` is `None` at import; each engine's `run()` constructs a `ParaViewManager` (so it can apply CLI screenshot settings) and installs it via `set_pv_manager()` before serving. The `default_prompt` string is a **behavioral contract sent to the LLM** ("only call strictly necessary functions per reply", color-map tips). Editing tool docstrings/`default_prompt` changes model behavior.
+- `paraview_mcp/manager.py` (~3090 lines) — single `ParaViewManager` class wrapping `paraview.simple`. All ParaView state lives here; `tools.py` is a thin tool shim over it. It does `from paraview.simple import *` at module top **plus** dozens of lazy `from paraview.simple import ...` inside methods — do **not** "fix" the star import; the module relies on it.
+- `paraview_mcp/v1/pv_mcp.py` and `paraview_mcp/v2/pv_mcp.py` — **thin `run()` shims only**. Both `import mcp, set_pv_manager, logger` from `paraview_mcp.tools` and share the same `mcp` instance and tool set. They differ only in transport: v1 serves over **stdio** (`mcp.run()`), v2 serves over MCP **streamable-http** (`mcp.run(transport="streamable-http")`) and binds to the CLI's `--server`/`--port` (MCP transport address, distinct from `--paraview-*`). Because the tools are shared, **there is no longer a "mirror v1 into v2" step** — edit `tools.py` once.
+- `paraview_mcp/v1/__init__.py` and `paraview_mcp/v2/__init__.py` re-export `ParaViewManager` from `paraview_mcp.manager`. `v2/__init__.py` also exposes the FastMCP display name as the `MCP_SERVER_NAME` constant (kept for backward compatibility) — do **not** override the module dunder `__name__` (it breaks `from paraview_mcp.v2 import <submodule>`).
+- No tests, no CI (CONTRIBUTING.md mentions Travis but there is no CI config in the repo). `data/` holds a couple of demo datasets (`tooth_*.raw`, `wavelet_benchmark.vti`).
+
+## Entrypoint: keep cli.py / main.py / README in sync
+
+`cli.py`, `main.py`, and the README "Running"/integration sections must agree on the argument namespace (a past mismatch made `paraview-mcp v1` raise `AttributeError`). Current verified interface:
+
+- Run with: `paraview-mcp v1 --paraview-server localhost --paraview-port 11111` (bare `paraview-mcp v1` works on defaults).
+- `main.py` reads `args.paraview_server`, `args.paraview_port`, `args.paraview_package_path`, `args.compress_screenshots`, `args.max_screenshot_width`, `args.screenshot_quality` for v1; v2 additionally reads `args.server`/`args.port` (MCP transport bind address).
+- v1 `run()` takes `server`/`port`; v2 `run()` takes `paraview_server`/`paraview_port`/`mcp_server`/`mcp_port`. If you add/rename a CLI flag, update `cli.py`, the relevant `pv_mcp.run()` signature, the `main.py` call, and every command/JSON snippet in `README.md` + `opencode-config.json` together. Verify with `python -c "from paraview_mcp.cli import parse_args; parse_args([...])"` (no ParaView needed).
 
 ## Environment & quirks
 
-- `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed and is intentionally absent from `pyproject.toml`. `pip install -e .` alone gives you `mcp` + `httpx` but the server will fail to import on startup.
-- Python version signals disagree across files — there is no single source of truth, so trust the runtime:
-    - `.python-version` → `3.14`
-    - `.pre-commit-config.yaml` → `python3.13`
-    - `pyproject.toml` → `>=3.10`
-    - `environment.yaml` pins `paraview=5.13.3=py310...` → the conda env actually runs on Python 3.10
-    - **In practice the runtime Python is whatever the conda `paraview` package supplies (3.10).** Pre-commit can use a different interpreter; do not "unify" these without testing.
-- `environment.yaml` has a stale header comment referencing a sibling project (`chatvis.main`, `uv run`, "minimal env for `pvpython`"). Ignore that wording — for this repo the conda env is the runtime env, and the README's `conda activate paraview_mcp && pip install -e .` flow is correct.
-- If ParaView is installed outside the active env, pass `--paraview_package_path /path/to/site-packages` and `main.py` will `sys.path.append` it before importing.
-- Logs go to `~/paraview_logs/paraview_mcp_external.log` (directory created on import of `main.py`). Don't look in the repo.
-- Screenshot behavior is tuned by env vars read in `main.py`: `PARAVIEW_COMPRESS_SCREENSHOTS`, `PARAVIEW_MAX_SCREENSHOT_WIDTH`, `PARAVIEW_SCREENSHOT_QUALITY`.
+- `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed. `pip install -e .` alone gives you `fastmcp` + `httpx` + `mcp[cli]` but the server fails to import at runtime.
+- Python version signals disagree — trust the runtime constraint, not the files:
+    - `.python-version` → `3.14`; `.pre-commit-config.yaml` → `python3.13`; `pyproject.toml` → `requires-python = ">=3.10"`; README → conda `python=3.10`.
+    - **In practice the Python version is dictated by whatever the conda `paraview` package supports** (typically 3.10/3.11). Use that env to run the server; pre-commit may use a different interpreter.
+- External ParaView: pass `--paraview-package-path /path/to/site-packages` (defined on the shared parent parser; appended to `sys.path` in `main.py` before the engine import).
 
 ## Running the server
 
@@ -41,51 +42,12 @@ pvserver --multi-clients --server-port=11111
 # 2. ParaView GUI → File → Connect → localhost:11111
 
 # 3. MCP server (canonical entrypoint is the hyphenated console script)
-paraview-mcp --server localhost --port 11111
+paraview-mcp v1 --paraview-server localhost --paraview-port 11111
+# or the streamable-http engine:
+paraview-mcp v2 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
 # or, for an external ParaView install:
-paraview-mcp --paraview_package_path /opt/paraview/lib/python3.x/site-packages
+paraview-mcp v1 --paraview-package-path /opt/paraview/lib/python3.x/site-packages
 ```
-
-`python paraview_mcp/main.py` and `python -m paraview_mcp.main` are **not** reliable because of the bare `from paraview_manager` import; use the console script.
-
-## Build / dev tooling
-
-- `make create-dev` — recreates the conda env from `environment.yaml`, installs pre-commit hooks, and runs `uv sync --group dev` inside the env. This is the supported setup path for contributors.
-- `make build` — wipes `dist/`, tags the version from the latest git tag (`uv version`), runs `uv build`, then `uv pip install dist/*.tar.gz`. Requires a git tag to exist.
-- `make freeze` — regenerates `environment.yaml`. **Manually verify after**: (1) channels include `nodefaults`, (2) the `pip:` section does **not** contain a self-reference to `paraview-mcp`. The Makefile prints this reminder.
-- `opencode-config.json` at the repo root is a ready-made OpenCode config that wires this server up; run with `OPENCODE_CONFIG=opencode-config.json opencode`.
-
-## Lint / format / hooks
-
-# Pre-commit is the source of truth for style. Hooks: `ruff-format`, `ruff-check`, `isort`, `bandit`, prettier (via `bunx`, requires `bun`), plus stock `pre-commit-hooks`.
-
-The package is split into a thin controller + a versioned engine. Do not look for tools in `main.py`.
-
-- `paraview_mcp/main.py` — thin controller for the `paraview-mcp` console script. Parses args, sets up logging, optionally `sys.path.append`s an external ParaView install, then calls `paraview_mcp.v1.pv_mcp.run()`. **Imports the engine lazily inside `main()`** because importing it pulls in `paraview.simple`.
-- `paraview_mcp/cli.py` — argparse surface only (no ParaView import). Requires a `v1`/`v2` subcommand; shared flags live on the `pv_parent` parent parser, so `v1` and `v2` both inherit `--paraview-server`, `--paraview-port`, `--paraview-package-path`, and the screenshot flags (`--compress-screenshots/--no-compress-screenshots`, `--max-screenshot-width`, `--screenshot-quality`).
-- `paraview_mcp/logger.py` — `setup_logging()`; writes to `~/paraview_logs/paraview_mcp_external.log` (dir created on call). Idempotent.
-- `paraview_mcp/v1/pv_mcp.py` (~1160 lines) — **all `@mcp.tool()` definitions** (43 tools) + the module-level `mcp = FastMCP(...)` and `run(...)`. `pv_manager` is module-global but set to `None` at import; `run()` constructs the `ParaViewManager` (so it can apply CLI screenshot settings) and reassigns it via `global pv_manager`. The `default_prompt` string is a **behavioral contract sent to the LLM** ("only call strictly necessary functions per reply", color-map tips). Editing tool docstrings/`default_prompt` changes model behavior.
-- `paraview_mcp/v1/paraview_manager.py` (~3090 lines) — single `ParaViewManager` class wrapping `paraview.simple`. All ParaView state lives here; `pv_mcp.py` is a thin tool shim.
-- `paraview_mcp/v2/` — **near-identical copy of v1** (same 43 tools, its own `paraview_manager.py` + `pv_mcp.py` with `run()`) and **now wired in**: `main.py` dispatches the `v2` engine to `paraview_mcp.v2.pv_mcp.run(...)`. The difference from v1 is the transport: v2 serves over MCP **streamable-http** (`mcp.run(transport="streamable-http")`) and binds to the CLI's `--server`/`--port` (MCP transport, distinct from `--paraview-*`), whereas v1 uses stdio. The leftover `NotImplementedError` in `main.py` is now only a dead `else` branch (the CLI restricts `engine` to `v1`/`v2`). Edits to v1 must usually be mirrored into v2 to keep them from diverging. Note: `v2/__init__.py` exposes the FastMCP display name as the `MCP_SERVER_NAME` constant — do **not** override the module dunder `__name__` (it breaks `from paraview_mcp.v2 import <submodule>`).
-
-No tests, no CI (CONTRIBUTING.md mentions Travis but there is no CI config in the repo).
-
-## Entrypoint: keep cli.py / main.py / README in sync
-
-`cli.py`, `main.py`, and the README "Running"/integration sections must agree on the argument namespace (a past mismatch made `paraview-mcp v1` raise `AttributeError`). Current verified interface:
-
-- Run with: `paraview-mcp v1 --paraview-server localhost --paraview-port 11111` (bare `paraview-mcp v1` works on defaults).
-- `main.py` reads `args.paraview_server`, `args.paraview_port`, `args.paraview_package_path`, `args.compress_screenshots`, `args.max_screenshot_width`, `args.screenshot_quality` — all produced by `cli.py`.
-- If you add/rename a CLI flag, update `cli.py`, the `pv_mcp.run()` signature, the `main.py` call, and every command/JSON snippet in `README.md` + `opencode-config.json` together. Verify with `python -c "from paraview_mcp.cli import parse_args; parse_args([...])"` (no ParaView needed).
-
-## Environment & quirks
-
-- `paraview.simple` is **only available from a ParaView build** (conda-forge `paraview` or a system ParaView install). It cannot be pip-installed. `pip install -e .` alone gives you `fastmcp` + `httpx` + `mcp[cli]` but the server fails to import at runtime.
-- `paraview_manager.py` does `from paraview.simple import *` at module top **plus** dozens of lazy `from paraview.simple import ...` inside methods. Ruff/isort will not flag the star import — do not "fix" it; the module relies on it.
-- Python version signals disagree — trust the runtime constraint, not the files:
-    - `.python-version` → `3.14`; `.pre-commit-config.yaml` → `python3.13`; `pyproject.toml` → `requires-python = ">=3.10"`; README → conda `python=3.10`.
-    - **In practice the Python version is dictated by whatever the conda `paraview` package supports** (typically 3.10/3.11). Use that env to run the server; pre-commit may use a different interpreter.
-- External ParaView: pass `--paraview-package-path /path/to/site-packages` (defined on the shared parent parser; appended to `sys.path` in `main.py` before the engine import).
 
 ## Build / dev tooling
 
@@ -100,43 +62,24 @@ No tests, no CI (CONTRIBUTING.md mentions Travis but there is no CI config in th
 
 Pre-commit is the source of truth for style. Hooks: stock `pre-commit-hooks`, `isort`, `ruff-format`, `ruff-check`, `bandit`, and a **local `prettier`** hook run via `bunx` over JS/TS/CSS/HTML/JSON/Markdown/YAML (4-space tabs, print-width 80). Install + run:
 
-> > > > > > > dev
-
 ```bash
 pre-commit install
 pre-commit run --all-files
 ```
 
-<<<<<<< HEAD
-No `ruff.toml` or `[tool.ruff]` config — ruff and isort run with defaults. Match existing style: 4-space indent (`.editorconfig`), double quotes, type hints on public tool signatures. `black` is configured in `pyproject.toml` (line-length 80) but is not in the pre-commit chain — ruff-format wins.
-
-## Adding or changing MCP tools
-
-- Every tool is `@mcp.tool()` in `main.py`, delegates to a `pv_manager.<method>()`, and returns a human-readable status string. Keep that contract.
-- `ParaViewManager` methods consistently return `(success: bool, message: str, ...payload)`. Preserve this shape — the tool wrappers destructure it.
-- Tool docstrings are sent to the LLM and double as prompt guidance (see the `[Tips: ...]` blocks). Edit them deliberately, not cosmetically.
-- For list/dict parameters, prefer the OpenAI-compatible variants already in the file (`list[dict[str, float]]` etc.). Commented-out older signatures are kept for reference — do not delete them without asking.
-- # If you add a tool, also append it to `list_commands()` so the LLM can discover it. Note: `list_commands()` is already partially out of sync with the actual `@mcp.tool()` set — fix entries you touch but don't treat it as authoritative.
-- No `ruff.toml` and no `[tool.ruff]` — ruff/isort run with defaults. `pyproject.toml` has `[tool.black] line-length = 80` but **black is not in the hook chain**; treat line-length 80 as the convention.
+- `pyproject.toml` has a `[tool.ruff]` config (line-length 80, `ignore = ["F403", "F405"]` for the load-bearing star import). The prettier hook needs `bun`/`bunx` on PATH.
 - Match existing style: 4-space indent (`.editorconfig`), double quotes, type hints on public tool signatures.
-- The prettier hook needs `bun`/`bunx` on PATH.
 
 ## Adding or changing MCP tools
 
-- Every tool is `@mcp.tool()` in `paraview_mcp/v1/pv_mcp.py`, delegates to a `pv_manager.<method>()`, and returns a human-readable status string. Keep that contract.
-- Methods on `ParaViewManager` consistently return `(success: bool, message: str, ...payload)`. Preserve this shape — tool functions destructure it.
+- Every tool is `@mcp.tool()` in `paraview_mcp/tools.py` (defined once, shared by both engines), delegates to a `pv_manager.<method>()`, and returns a human-readable status string. Keep that contract.
+- Methods on `ParaViewManager` (`paraview_mcp/manager.py`) consistently return `(success: bool, message: str, ...payload)`. Preserve this shape — tool functions destructure it.
 - Tool docstrings are sent to the LLM and double as prompt guidance (see the `[Tips: ...]` blocks). Edit them deliberately, not cosmetically.
 - For list/dict parameters, prefer the OpenAI-compatible variants already in the file (`list[dict[str, float]]` etc.). Several older signatures and tools are kept commented-out (`# @mcp.tool()`) for reference — do not delete them without asking.
-- If you add a tool, also append it to `list_commands()` so the LLM can discover it, and update the **MCP Tool Reference** table in `README.md`.
-    > > > > > > > dev
+- `list_commands()` is **generated from the registered tools** (`mcp._tool_manager.list_tools()`), so adding a `@mcp.tool()` automatically lists it — no manual list to maintain. Still update the **MCP Tool Reference** table in `README.md`.
 
 ## Git / branches / PRs
 
-<<<<<<< HEAD
-
-- Two remotes: `origin` (fork: `NicholasSynovic/paraview_mcp`), `upstream` (`llnl/paraview_mcp`). Active development happens on `dev`; `main` tracks `origin/main`.
-- # Upstream README warns the pvserver-sync feature is deprecated in recent ParaView; GUI may show blank/incorrect content and stability issues are expected — **not your bug to fix**.
 - Active branch is `dev`. Two remotes: `origin` (fork: `NicholasSynovic/paraview_mcp`), `upstream` (`llnl/paraview_mcp`).
 - CONTRIBUTING.md: branch off `main`, use a fork + PR, imperative commit messages (e.g., "Adds X").
 - Upstream README warns the pvserver-sync feature is deprecated in recent ParaView; ParaView-GUI sync/stability issues are expected and **not** your bug to fix.
-    > > > > > > > dev
