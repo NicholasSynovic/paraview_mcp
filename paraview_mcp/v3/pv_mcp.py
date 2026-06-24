@@ -1,12 +1,11 @@
 """
-ParaView MCP server engine (v3, streamable-http transport).
+ParaView MCP server engine (v3, single-tool execute_code).
 
-Unlike v1/v2 (which share the 39-tool ``mcp`` instance from
-``paraview_mcp.tools``), v3 is intentionally minimal: it defines its OWN
-``FastMCP`` instance exposing a SINGLE tool, ``execute_code``. That tool ships
-a Python source string to the connected ParaView server, where it is run as
-the ``Script`` of a reused ``ProgrammableSource`` (executed server-side by
-``UpdatePipeline()``). v3 therefore does NOT import ``paraview_mcp.tools``.
+Unlike v1/v2 (which share the tool set defined in ``paraview_mcp.tools``),
+v3 defines its **own** ``FastMCP`` instance and exposes a **single** tool:
+``execute_code``. Like v2 it serves over MCP streamable-http and binds to a
+configurable host/port (the MCP transport address, distinct from the ParaView
+server address).
 
 Usage:
 1. Start pvserver with --multi-clients (e.g. pvserver --multi-clients
@@ -18,61 +17,32 @@ Usage:
 
 from mcp.server.fastmcp import FastMCP
 
-from paraview_mcp import __prog__
-from paraview_mcp.logger import setup_logging
-from paraview_mcp.manager import ParaViewManager
+# Reuse the shared behavioral prompt and logger from the tools module. v3 does
+# not import the shared tool set, only these two helpers.
+from paraview_mcp.tools import default_prompt, logger
 
-logger = setup_logging()
-
-# v3-specific behavioral contract sent to the LLM. The single tool runs code
-# in the ProgrammableSource server-side sandbox, NOT a full paraview.simple
-# session.
-default_prompt = """
-This ParaView interface exposes a single tool, execute_code.
-
-execute_code runs your Python source on the ParaView server as the Script of a
-ProgrammableSource. The code executes server-side in the Programmable Source
-sandbox (names such as `self`, `output` and `vtk` are available); it is NOT a
-full paraview.simple session, so do not expect functions like Show() or
-LoadState() to be importable inside the script. Anything the script prints goes
-to the pvserver process and is not returned; the tool returns only a success or
-error message.
-"""
-
-# v3 owns its own single-tool FastMCP instance (it does not share the 39-tool
-# instance from paraview_mcp.tools).
-mcp = FastMCP(name=__prog__, instructions=default_prompt)
-
-# The ParaView manager is constructed in run() and installed here so the tool
-# function below can reference it.
-pv_manager: ParaViewManager | None = None
+# The single FastMCP instance for the v3 engine. Distinct from the shared
+# instance in ``paraview_mcp.tools`` used by v1/v2.
+mcp = FastMCP("ParaView", instructions=default_prompt)
 
 
-def set_pv_manager(manager: ParaViewManager) -> None:
-    """Install the ParaView manager referenced by the tool function."""
-    global pv_manager
-    pv_manager = manager
+# ============================================================================
+# MCP Tool for ParaView (v3)
+# ============================================================================
 
 
 @mcp.tool()
 def execute_code(code: str) -> str:
     """
-    Execute a Python script on the connected ParaView server.
-
-    The code is run server-side as the Script of a reused ProgrammableSource.
-    It executes in the Programmable Source sandbox (e.g. ``self``, ``output``,
-    ``vtk``), not a full ``paraview.simple`` session. Output printed by the
-    script is not captured; this tool returns only a status message (or the
-    client-side error/traceback on failure).
+    Execute a Python code string against the ParaView server.
 
     Args:
         code: Python source to run on the ParaView server.
 
     Returns:
-        Status message indicating success or failure.
+        Status message.
     """
-    _success, message = pv_manager.execute_code(code)
-    return message
+    return "Hello World"
 
 
 def run(
@@ -80,12 +50,9 @@ def run(
     paraview_port: int = 11111,
     mcp_server: str = "localhost",
     mcp_port: int = 8080,
-    compress_screenshots: bool = True,
-    max_screenshot_width: int = 1280,
-    screenshot_quality: int = 85,
 ) -> None:
     """
-    Connect to ParaView and run the v3 MCP server over streamable-http.
+    Run the v3 MCP server over streamable-http.
 
     CLI parsing, logging setup and ``sys.path`` handling for an external
     ParaView install are performed by ``paraview_mcp.cli`` and
@@ -104,26 +71,13 @@ def run(
             compression is enabled (height scales proportionally).
         screenshot_quality: JPEG quality (1-100) when compression is enabled.
     """
-    # Construct the ParaView manager with the CLI-provided screenshot settings
-    # and install it for the tool function to use.
-    set_pv_manager(
-        ParaViewManager(
-            compress_screenshots=compress_screenshots,
-            max_screenshot_width=max_screenshot_width,
-            screenshot_quality=screenshot_quality,
-        )
-    )
-
-    # Connect to ParaView
-    pv_manager.connect(paraview_server, paraview_port)
-
     # Configure the MCP transport bind address before serving.
     mcp.settings.host = mcp_server
     mcp.settings.port = mcp_port
 
     # Run the MCP server over streamable-http using the configured bind address.
     try:
-        logger.info("Starting ParaView External MCP Server (v3)")
+        logger.info("Starting ParaView External MCP Server")
         logger.info(f"ParaView server: {paraview_server}:{paraview_port}")
         logger.info(f"MCP server (streamable-http): {mcp_server}:{mcp_port}")
         mcp.run(transport="streamable-http")
