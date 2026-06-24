@@ -158,7 +158,7 @@ Open ParaView → **File → Connect** → add a server at `localhost:11111` →
 
 **3. Start the MCP server**:
 
-`paraview-mcp` requires an engine subcommand (`v1` or `v2`). Use `v1` for the current engine:
+`paraview-mcp` requires an engine subcommand (`v1`, `v2`, or `v3`). Use `v1` for the current engine:
 
 ```bash
 paraview-mcp v1 --paraview-server localhost --paraview-port 11111
@@ -185,6 +185,26 @@ The two address pairs are distinct:
 
 The streamable-http endpoint is served at `http://<server>:<port>/mcp`. Point a
 remote-capable MCP client at that URL (see the OpenCode example below).
+
+### V3 engine (single `execute_code` tool)
+
+The `v3` engine is intentionally minimal: it exposes a **single** tool,
+`execute_code`, instead of the 39 tools shared by `v1`/`v2`. The tool ships a
+Python source string to the connected `pvserver`, where it is run as the
+`Script` of a reused `ProgrammableSource` (executed server-side by
+`UpdatePipeline()`). The script runs in the Programmable Source sandbox (e.g.
+`self`, `output`, `vtk`), **not** a full `paraview.simple` session, and its
+printed output is not captured — `execute_code` returns only a success or
+error message. Like `v2`, it serves over streamable-http and takes the same
+`--server` / `--port` bind options.
+
+```bash
+paraview-mcp v3 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+```
+
+> v3's `execute_code` is not listed in the MCP Tool Reference table below
+> (that table covers the shared `v1`/`v2` tool set defined in
+> `paraview_mcp/tools.py`).
 
 ### External ParaView install
 

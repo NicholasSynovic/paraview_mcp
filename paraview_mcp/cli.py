@@ -20,8 +20,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     Returns:
         The parsed argument namespace. Depending on the chosen sub-command,
-        it will contain 'engine' ("v1" or "v2") along with the engine-specific
-        arguments.
+        it will contain 'engine' ("v1", "v2" or "v3") along with the
+        engine-specific arguments.
     """
     # 1. Define the shared parent parser for ParaView options
     # We set add_help=False so it doesn't conflict with the subparser help flags
@@ -70,7 +70,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--screenshot-quality",
         type=int,
         default=85,
-        help=("JPEG quality 1-100 when compression is enabled (default: %(default)s)"),
+        help=(
+            "JPEG quality 1-100 when compression is enabled (default: %(default)s)"
+        ),
     )
 
     # 2. Define the main root parser
@@ -117,6 +119,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     v2_mcp_group.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help=(
+            "MCP server bind port (transport), distinct from "
+            "--paraview-port (default: %(default)s)"
+        ),
+    )
+
+    # =========================================================================
+    # --- V3 Subparser Configuration -----------------------------------------
+    # =========================================================================
+    # Single-tool (execute_code) engine. Like v2 it serves over streamable-http
+    # and adds its own MCP bind options.
+    v3_parser = subparsers.add_parser(
+        "v3", parents=[pv_parent], help="Run using V3 engine protocols"
+    )
+
+    v3_mcp_group = v3_parser.add_argument_group("V3 MCP Server Options")
+    v3_mcp_group.add_argument(
+        "--server",
+        type=str,
+        default="localhost",
+        help=(
+            "MCP server bind hostname (transport), distinct from "
+            "--paraview-server (default: %(default)s)"
+        ),
+    )
+    v3_mcp_group.add_argument(
         "--port",
         type=int,
         default=8080,

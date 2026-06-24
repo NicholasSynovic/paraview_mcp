@@ -14,6 +14,7 @@ import math
 import os
 import re
 import tempfile
+import traceback
 from pathlib import Path
 
 from paraview.simple import *
@@ -49,6 +50,9 @@ class ParaViewManager:
         # which is needed for operations like volume rendering.
         self.original_source = None
         self._data_folder = ""
+        # Reused ProgrammableSource for execute_code() (v3 engine). Lazily
+        # created on the first call and reused across calls.
+        self._prog_source = None
 
         # Screenshot compression settings
         self.compress_screenshots = compress_screenshots
@@ -3104,3 +3108,42 @@ class ParaViewManager:
             error_msg = f"Error saving ParaView state: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg, ""
+
+    def execute_code(self, code: str) -> tuple[bool, str]:
+        """
+        Run a Python script on the ParaView server via a ProgrammableSource.
+
+        The code string is assigned to the ``Script`` property of a reused
+        ``ProgrammableSource`` and executed server-side by ``UpdatePipeline()``.
+        The script runs in the Programmable Source sandbox on the server (names
+        such as ``self``, ``output`` and ``vtk`` are available), not in a full
+        ``paraview.simple`` session.
+
+        No stdout/stderr is captured: anything the script prints goes to the
+        pvserver process. On failure, the client-side error/traceback raised by
+        ``UpdatePipeline()`` is returned as the message.
+
+        Args:
+            code: Python source to run on the ParaView server.
+
+        Returns:
+            tuple: (success, message)
+        """
+        try:
+            # Lazily create the ProgrammableSource and reuse it across calls.
+            if self._prog_source is None:
+                self._prog_source = ProgrammableSource()
+
+            self._prog_source.Script = code
+            self._prog_source.UpdatePipeline()
+
+            message = "Script executed on the ParaView server."
+            self.logger.info(message)
+            return True, message
+        except Exception:
+            error_msg = (
+                "Error executing script on the ParaView server:\n"
+                f"{traceback.format_exc()}"
+            )
+            self.logger.error(error_msg)
+            return False, error_msg
