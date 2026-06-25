@@ -247,7 +247,56 @@ These set the startup defaults; they can still be overridden at runtime via the 
 
 ## Integration: OpenCode
 
-Add the following to `~/.config/opencode/opencode.json`:
+This repository ships a ready-to-use [`opencode.json`](./opencode.json) at its
+root. Launch OpenCode with it via the `OPENCODE_CONFIG` environment variable:
+
+```bash
+OPENCODE_CONFIG=opencode.json opencode
+```
+
+Alternatively, copy the `mcp` block into your global
+`~/.config/opencode/opencode.json`.
+
+The shipped config registers **two** MCP entries for the same ParaView server —
+one per engine — because the `v1` and `v2` engines expose the **same** tool set.
+Only one should be enabled at a time; enabling both registers duplicate tools.
+As shipped, **v1 is disabled and v2 is enabled**:
+
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "paraview": {
+            "type": "local",
+            "command": [
+                "paraview-mcp",
+                "v1",
+                "--paraview-server",
+                "localhost",
+                "--paraview-port",
+                "11111"
+            ],
+            "enabled": false
+        },
+        "paraview-v2": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
+            "enabled": true
+        }
+    }
+}
+```
+
+To switch engines, flip the two `"enabled"` flags so exactly one is `true`.
+
+### OpenCode with the v1 engine (local / stdio)
+
+The `v1` entry is a `"type": "local"` MCP: OpenCode **spawns** `paraview-mcp v1`
+itself and communicates over stdio, so you do **not** start the MCP server
+manually. You still need a running `pvserver` and a connected ParaView GUI (see
+[Running](#running)).
+
+To use v1, set its `"enabled": true` and the v2 entry's `"enabled": false`:
 
 ```json
 {
@@ -261,32 +310,47 @@ Add the following to `~/.config/opencode/opencode.json`:
                 "localhost",
                 "--paraview-port",
                 "11111"
-            ]
+            ],
+            "enabled": true
+        },
+        "paraview-v2": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
+            "enabled": false
         }
     }
 }
 ```
 
-Or use the provided config like so:
+### OpenCode with the v2 engine (remote / streamable-http)
+
+The `v2` engine serves over the MCP **streamable-http** transport, so it is a
+long-running server that OpenCode connects to — OpenCode does **not** spawn it.
+You must start it yourself **before** launching OpenCode:
 
 ```bash
-OPENCODE_CONFIG=opencode-config.json opencode
+paraview-mcp v2 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
 ```
 
-To use the `v2` engine instead, start the server separately
-(`paraview-mcp v2 --server localhost --port 8080`) and register it as a
-`remote` MCP pointing at the streamable-http endpoint:
+The `paraview-v2` entry is a `"type": "remote"` MCP whose `url` must match the
+`--server` / `--port` you launched the engine with. The default bind address is
+`localhost:8080`, and the streamable-http endpoint is served at the `/mcp` path,
+giving `http://localhost:8080/mcp`:
 
 ```json
 {
     "mcp": {
-        "paraview": {
+        "paraview-v2": {
             "type": "remote",
-            "url": "http://localhost:8080/mcp"
+            "url": "http://localhost:8080/mcp",
+            "enabled": true
         }
     }
 }
 ```
+
+> If you start the v2 engine with a non-default `--server` / `--port`, update the
+> `url` to match (always keeping the `/mcp` path suffix).
 
 ## Integration: Claude Code
 
