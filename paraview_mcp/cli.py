@@ -39,7 +39,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=11111,
         help="ParaView server port (default: %(default)s)",
     )
-    pv_group.add_argument(
+    # --paraview-package-path lives on its own parent parser so only engines
+    # that import paraview.simple in-process (v1/v2) inherit it. v3 is
+    # import-clean of ParaView (only its pv_runner.py subprocess imports it),
+    # so it does NOT need this flag.
+    pkg_parent = argparse.ArgumentParser(add_help=False)
+    pkg_group = pkg_parent.add_argument_group("External ParaView Options")
+    pkg_group.add_argument(
         "--paraview-package-path",
         type=str,
         default=None,
@@ -50,7 +56,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
 
-    ss_group = pv_parent.add_argument_group("Screenshot Compression Options")
+    # Screenshot options live on a separate parent parser so engines can opt
+    # in independently. v1/v2 inherit it; v3 (no screenshot functionality) does
+    # not.
+    ss_parent = argparse.ArgumentParser(add_help=False)
+    ss_group = ss_parent.add_argument_group("Screenshot Compression Options")
     ss_group.add_argument(
         "--compress-screenshots",
         action=argparse.BooleanOptionalAction,
@@ -97,7 +107,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # =========================================================================
     # Inherits the ParaView options automatically via the parents parameter
     subparsers.add_parser(
-        "v1", parents=[pv_parent], help="Run using V1 engine protocols"
+        "v1",
+        parents=[pv_parent, ss_parent, pkg_parent],
+        help="Run using V1 engine protocols",
     )
 
     # =========================================================================
@@ -105,7 +117,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # =========================================================================
     # Inherits the ParaView options via parents, and adds its own MCP options
     v2_parser = subparsers.add_parser(
-        "v2", parents=[pv_parent], help="Run using V2 engine protocols"
+        "v2",
+        parents=[pv_parent, ss_parent, pkg_parent],
+        help="Run using V2 engine protocols",
     )
 
     v2_mcp_group = v2_parser.add_argument_group("V2 MCP Server Options")

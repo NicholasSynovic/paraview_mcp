@@ -15,15 +15,31 @@ Usage:
    http://localhost:8080/mcp).
 """
 
+import shutil
+import subprocess
+from pathlib import Path
+
 from mcp.server.fastmcp import FastMCP
 
-# Reuse the shared behavioral prompt and logger from the tools module. v3 does
-# not import the shared tool set, only these two helpers.
-from paraview_mcp.tools import default_prompt, logger
+# Import the prompt and logger from ParaView-free modules (NOT from
+# paraview_mcp.tools, which transitively imports manager.py -> paraview.simple).
+# This keeps the v3 engine process import-clean of ParaView; only the
+# pv_runner.py subprocess (run via pvpython) needs paraview.simple.
+from paraview_mcp.logger import setup_logging
+from paraview_mcp.prompts import default_prompt
+
+logger = setup_logging()
 
 # The single FastMCP instance for the v3 engine. Distinct from the shared
 # instance in ``paraview_mcp.tools`` used by v1/v2.
 mcp = FastMCP("ParaView", instructions=default_prompt)
+
+# Standalone runner script invoked as a subprocess by ``execute_code``. Resolved
+# relative to this file so it works regardless of the current working directory.
+PV_RUNNER = Path(__file__).parent / "pv_runner.py"
+
+# Maximum time (seconds) to wait for the runner subprocess before giving up.
+SUBPROCESS_TIMEOUT = 60
 
 
 # ============================================================================
@@ -32,17 +48,60 @@ mcp = FastMCP("ParaView", instructions=default_prompt)
 
 
 @mcp.tool()
-def execute_code(code: str) -> str:
+def execute_code(code: str) -> dict:
     """
     Execute a Python code string against the ParaView server.
+
+    The code is run by invoking ``pv_runner.py`` as a subprocess under
+    ``pvpython``. The runner connects to the default ParaView server
+    (localhost:11111) and executes the supplied code in a full
+    ``paraview.simple`` session. Standard output and standard error from the
+    subprocess are captured and returned.
 
     Args:
         code: Python source to run on the ParaView server.
 
     Returns:
-        Status message.
+        A dict with keys ``returncode`` (int), ``stdout`` (str) and
+        ``stderr`` (str).
     """
-    return "Hello World"
+    pvpython = shutil.which("pvpython")
+    if pvpython is None:
+        message = "pvpython not found on PATH"
+        logger.error(message)
+        return {"returncode": -1, "stdout": "", "stderr": message}
+
+    cmd: list[str] = [pvpython, str(PV_RUNNER), "--code", code]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+        )
+        return {
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+    except subprocess.TimeoutExpired as e:
+        stdout = e.stdout or ""
+        stderr = e.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode(errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        timeout_note = (
+            f"Subprocess timed out after {SUBPROCESS_TIMEOUT} seconds."
+        )
+        logger.error(timeout_note)
+        stderr = f"{stderr}\n{timeout_note}" if stderr else timeout_note
+        return {"returncode": -1, "stdout": stdout, "stderr": stderr}
+    except Exception as e:
+        message = f"Error running pv_runner.py: {str(e)}"
+        logger.error(message)
+        return {"returncode": -1, "stdout": "", "stderr": message}
 
 
 def run(
@@ -65,11 +124,6 @@ def run(
             from the ParaView server.
         mcp_port: Port the MCP server binds to (transport), distinct from the
             ParaView port.
-        compress_screenshots: Whether to compress screenshots to reduce token
-            usage.
-        max_screenshot_width: Maximum screenshot width in pixels when
-            compression is enabled (height scales proportionally).
-        screenshot_quality: JPEG quality (1-100) when compression is enabled.
     """
     # Configure the MCP transport bind address before serving.
     mcp.settings.host = mcp_server

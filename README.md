@@ -189,18 +189,25 @@ remote-capable MCP client at that URL (see the OpenCode example below).
 ### V3 engine (single `execute_code` tool)
 
 The `v3` engine is intentionally minimal: it exposes a **single** tool,
-`execute_code`, instead of the 39 tools shared by `v1`/`v2`. The tool ships a
-Python source string to the connected `pvserver`, where it is run as the
-`Script` of a reused `ProgrammableSource` (executed server-side by
-`UpdatePipeline()`). The script runs in the Programmable Source sandbox (e.g.
-`self`, `output`, `vtk`), **not** a full `paraview.simple` session, and its
-printed output is not captured — `execute_code` returns only a success or
-error message. Like `v2`, it serves over streamable-http and takes the same
-`--server` / `--port` bind options.
+`execute_code`, instead of the 39 tools shared by `v1`/`v2`. The tool runs the
+supplied Python source by spawning `pvpython` as a subprocess (it must be on
+`PATH`), which executes the bundled `pv_runner.py`. That runner connects to the
+ParaView server at `localhost:11111` and runs the code in a **full
+`paraview.simple` session** (not a Programmable Source sandbox). The
+subprocess's standard output and standard error are captured, and
+`execute_code` returns a dict with `returncode`, `stdout`, and `stderr` keys.
+The subprocess is killed after a 60-second timeout. Like `v2`, the v3 engine
+serves over streamable-http and takes the same `--server` / `--port` bind
+options for the MCP transport.
 
 ```bash
 paraview-mcp v3 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
 ```
+
+> The v3 engine itself does not connect to `pvserver`; only the `pv_runner.py`
+> subprocess does, and it uses its own `localhost:11111` defaults (the v3
+> `--paraview-server` / `--paraview-port` flags are accepted but not yet
+> forwarded to the runner).
 
 > v3's `execute_code` is not listed in the MCP Tool Reference table below
 > (that table covers the shared `v1`/`v2` tool set defined in
@@ -214,9 +221,14 @@ If ParaView is installed outside the active conda env (e.g., a system or custom 
 paraview-mcp v1 --paraview-package-path /opt/paraview/lib/python3.x/site-packages
 ```
 
+`--paraview-package-path` is available on the `v1` and `v2` engines only. The
+`v3` engine does not import `paraview.simple` in its own process (only its
+`pv_runner.py` subprocess does, under `pvpython`), so it neither needs nor
+accepts this flag.
+
 ### Screenshot compression
 
-Screenshots returned by `get_screenshot` are compressed by default to reduce LLM token usage. The defaults can be configured with global CLI flags (available on every engine subcommand):
+Screenshots returned by `get_screenshot` are compressed by default to reduce LLM token usage. The defaults can be configured with CLI flags (available on the `v1` and `v2` engine subcommands; `v3` has no screenshot functionality):
 
 ```bash
 paraview-mcp v1 --no-compress-screenshots

@@ -53,3 +53,7 @@ def main() -> None:
 
     # Execute the `pvpython` code
     exec(args.code)
+
+
+if __name__ == "__main__":
+    main()

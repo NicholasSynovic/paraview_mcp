@@ -24,7 +24,9 @@ def main() -> None:
 
     # Make an external ParaView install importable before importing the
     # engine module (which imports paraview.simple at import time).
-    if args.paraview_package_path:
+    # v3 does not define --paraview-package-path (it is import-clean of
+    # paraview.simple), so access it defensively.
+    if getattr(args, "paraview_package_path", None):
         sys.path.append(args.paraview_package_path)
 
     try:
@@ -64,9 +66,6 @@ def main() -> None:
                 paraview_port=args.paraview_port,
                 mcp_server=args.server,
                 mcp_port=args.port,
-                compress_screenshots=args.compress_screenshots,
-                max_screenshot_width=args.max_screenshot_width,
-                screenshot_quality=args.screenshot_quality,
             )
         else:
             raise NotImplementedError(
