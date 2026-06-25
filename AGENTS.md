@@ -51,6 +51,8 @@ paraview-mcp v2 --paraview-server localhost --paraview-port 11111 --server local
 paraview-mcp v1 --paraview-package-path /opt/paraview/lib/python3.x/site-packages
 ```
 
+- `scripts/start_pvserver.bash` is a one-line convenience wrapper for step 1 (`pvserver --multi-clients --server-port=11111`) — the **only** file under `scripts/`.
+
 ## Build / dev tooling
 
 - Install: `pip install -e .` (registers the `paraview-mcp` console script → `paraview_mcp.main:main`). Build backend is **hatchling**; wheel packages `paraview_mcp` only.

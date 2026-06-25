@@ -152,6 +152,8 @@ Follow these three steps **in order**:
 pvserver --multi-clients --server-port=11111
 ```
 
+The repo also ships `scripts/start_pvserver.bash`, a one-line wrapper that runs exactly this command.
+
 **2. Connect the ParaView GUI** to the running server:
 
 Open ParaView → **File → Connect** → add a server at `localhost:11111` → click **Connect**.
@@ -456,4 +458,4 @@ ParaView-MCP is distributed under the terms of the BSD-3-Clause license. See [LI
 
 ## Notice
 
-Third-party attributions are recorded in [NOTICE](./NOTICE).
+Third-party attributions are recorded in [NOTICE](./NOTICE.md).
