@@ -257,10 +257,12 @@ OPENCODE_CONFIG=opencode.json opencode
 Alternatively, copy the `mcp` block into your global
 `~/.config/opencode/opencode.json`.
 
-The shipped config registers **two** MCP entries for the same ParaView server —
-one per engine — because the `v1` and `v2` engines expose the **same** tool set.
-Only one should be enabled at a time; enabling both registers duplicate tools.
-As shipped, **v1 is disabled and v2 is enabled**:
+The shipped config registers **three** MCP entries for the same ParaView server —
+one per engine. The `v1` and `v2` engines expose the **same** tool set, while
+`v3` exposes only the single `execute_code` tool. Only one entry should be
+enabled at a time; enabling more than one registers duplicate/competing tools
+(and `v2`/`v3` both bind `localhost:8080` by default, so only one can run).
+As shipped, **v1 and v2 are disabled and v3 is enabled**:
 
 ```json
 {
@@ -281,13 +283,18 @@ As shipped, **v1 is disabled and v2 is enabled**:
         "paraview-v2": {
             "type": "remote",
             "url": "http://localhost:8080/mcp",
+            "enabled": false
+        },
+        "paraview-v3": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
             "enabled": true
         }
     }
 }
 ```
 
-To switch engines, flip the two `"enabled"` flags so exactly one is `true`.
+To switch engines, flip the three `"enabled"` flags so exactly one is `true`.
 
 ### OpenCode with the v1 engine (local / stdio)
 
@@ -351,6 +358,46 @@ giving `http://localhost:8080/mcp`:
 
 > If you start the v2 engine with a non-default `--server` / `--port`, update the
 > `url` to match (always keeping the `/mcp` path suffix).
+
+### OpenCode with the v3 engine (remote / streamable-http)
+
+The `v3` engine also serves over the MCP **streamable-http** transport, so like
+`v2` it is a long-running server that OpenCode connects to — OpenCode does
+**not** spawn it. You must start it yourself **before** launching OpenCode:
+
+```bash
+paraview-mcp v3 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+```
+
+The `paraview-v3` entry is a `"type": "remote"` MCP whose `url` must match the
+`--server` / `--port` you launched the engine with. The default bind address is
+`localhost:8080`, and the streamable-http endpoint is served at the `/mcp` path,
+giving `http://localhost:8080/mcp`:
+
+```json
+{
+    "mcp": {
+        "paraview-v3": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
+            "enabled": true
+        }
+    }
+}
+```
+
+> Notes specific to v3:
+>
+> - v3 exposes a **single** tool, `execute_code`, which runs arbitrary
+>   `paraview.simple` code on the server.
+> - The v3 engine process itself does **not** connect to `pvserver`; only its
+>   `pv_runner.py` subprocess (run via `pvpython`) does, and it always uses
+>   `localhost:11111`. **`pvserver` must be reachable on `localhost:11111`**
+>   regardless of the `--paraview-server` / `--paraview-port` you pass.
+> - `pvpython` must be on your `PATH` (v3 shells out to it).
+> - v3 has **no** screenshot flags and **no** `--paraview-package-path`.
+> - v3 and v2 both bind `localhost:8080` by default — run only one at a time, or
+>   give them different `--port` values.
 
 ## Integration: Claude Code
 

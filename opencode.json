@@ -21,6 +21,11 @@
         "paraview-v2": {
             "type": "remote",
             "url": "http://localhost:8080/mcp",
+            "enabled": false
+        },
+        "paraview-v3": {
+            "type": "remote",
+            "url": "http://localhost:8080/mcp",
             "enabled": true
         }
     }
