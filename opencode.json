@@ -26,7 +26,8 @@
         "paraview-v3": {
             "type": "remote",
             "url": "http://localhost:8080/mcp",
-            "enabled": true
+            "enabled": true,
+            "timeout": 150000
         }
     }
 }

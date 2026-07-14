@@ -146,9 +146,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # --- V3 Subparser Configuration -----------------------------------------
     # =========================================================================
     # Single-tool (execute_code) engine. Like v2 it serves over streamable-http
-    # and adds its own MCP bind options.
+    # and adds its own MCP bind options. v3 manages its own pvserver per call,
+    # so it does NOT inherit pv_parent (--paraview-server/--paraview-port).
     v3_parser = subparsers.add_parser(
-        "v3", parents=[pv_parent], help="Run using V3 engine protocols"
+        "v3", help="Run using V3 engine protocols"
     )
 
     v3_mcp_group = v3_parser.add_argument_group("V3 MCP Server Options")

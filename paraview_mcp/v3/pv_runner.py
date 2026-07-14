@@ -6,19 +6,23 @@ from paraview.simple import *
 def cli_parser() -> Namespace:
     parser: ArgumentParser = ArgumentParser(
         prog="ParaView Runner",
-        description="Connects to a remote ParaView instance and execute arbitary code",
+        description="Listens for a reverse connection from a ParaView server and executes arbitrary code",
     )
     parser.add_argument(
         "--pv-host",
         type=str,
         default="localhost",
-        help="Remote ParaView hostname",
+        help=(
+            "Remote ParaView hostname. UNUSED in reverse-connection mode "
+            "(the server is told which client to dial back via "
+            "--client-host); kept for CLI-signature stability."
+        ),
     )
     parser.add_argument(
         "--pv-port",
         type=int,
         default=11111,
-        help="Remote ParaView port number",
+        help="Local port to listen on for the server's reverse connection",
     )
     parser.add_argument(
         "--code",
@@ -29,30 +33,32 @@ def cli_parser() -> Namespace:
     return parser.parse_args()
 
 
-def connect(hostname: str, port: int) -> None:
+def connect(port: int) -> None:
     """
-    Connect to a ParaView remote.
+    Listen for a reverse connection from a ``pvserver``.
 
-    `hostname` and `port` are applied to both the data server and the render
-    server.
+    In reverse-connection mode the *runner* (this client) opens a listening
+    socket and waits for the server to dial back. This avoids the forward
+    client/server hostname-advertisement mismatch (the server advertises its
+    system hostname, not ``localhost``), which otherwise refuses every
+    connection for ParaView's full connect-retry window.
+
+    Note: ``ReverseConnect`` is passed a **string** port to work around a bug
+    in ParaView 5.13.x where the int port is concatenated into a URL string.
     """
 
-    Connect(
-        ds_host=hostname,
-        ds_port=port,
-        rs_host=hostname,
-        rs_port=port,
-    )
+    ReverseConnect(str(port))
 
 
 def main() -> None:
     args: Namespace = cli_parser()
 
-    # Connect to ParaView remote
-    connect(hostname=args.pv_host, port=args.pv_port)
+    # Listen for the server's reverse connection. Must happen before pvserver
+    # is launched (the runner is the listener in reverse-connection mode).
+    connect(port=args.pv_port)
 
     # Execute the `pvpython` code
-    exec(args.code)
+    exec(args.code)  # nosec B102 - exec is the intended mechanism for this runner
 
 
 if __name__ == "__main__":

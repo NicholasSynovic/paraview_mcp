@@ -191,25 +191,32 @@ remote-capable MCP client at that URL (see the OpenCode example below).
 ### V3 engine (single `execute_code` tool)
 
 The `v3` engine is intentionally minimal: it exposes a **single** tool,
-`execute_code`, instead of the 39 tools shared by `v1`/`v2`. The tool runs the
+`execute_code`, instead of the 39 tools shared by `v1`/`v2`. v3 is
+**self-contained and stateless**: each `execute_code` call spawns its own
+short-lived, single-client `pvserver` on an ephemeral local port, runs the
 supplied Python source by spawning `pvpython` as a subprocess (it must be on
-`PATH`), which executes the bundled `pv_runner.py`. That runner connects to the
-ParaView server at `localhost:11111` and runs the code in a **full
-`paraview.simple` session** (not a Programmable Source sandbox). The
-subprocess's standard output and standard error are captured, and
-`execute_code` returns a dict with `returncode`, `stdout`, and `stderr` keys.
-The subprocess is killed after a 60-second timeout. Like `v2`, the v3 engine
+`PATH`) which executes the bundled `pv_runner.py` against that server in a
+**full `paraview.simple` session** (not a Programmable Source sandbox), then
+tears the `pvserver` down again. You do **not** need to start `pvserver`
+manually for v3, and there is **no** pipeline state shared between calls (each
+call starts from a blank session), so multi-step workflows must be expressed
+within a single `code` string.
+
+All output is captured: `execute_code` returns a dict with `returncode`,
+`runner_stdout`, `runner_stderr`, `pvserver_stdout`, and `pvserver_stderr`
+keys, and also writes per-call log files
+(`~/paraview_logs/call_<timestamp>_runner.log` and `..._pvserver.log`). The
+runner subprocess is killed after a 60-second timeout. Like `v2`, the v3 engine
 serves over streamable-http and takes the same `--server` / `--port` bind
-options for the MCP transport.
+options for the MCP transport. Because v3 manages its own server, it does
+**not** accept `--paraview-server` / `--paraview-port`.
 
 ```bash
-paraview-mcp v3 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+paraview-mcp v3 --server localhost --port 8080
 ```
 
-> The v3 engine itself does not connect to `pvserver`; only the `pv_runner.py`
-> subprocess does, and it uses its own `localhost:11111` defaults (the v3
-> `--paraview-server` / `--paraview-port` flags are accepted but not yet
-> forwarded to the runner).
+> `pvserver` **and** `pvpython` must both be on your `PATH`; v3 shells out to
+> each per `execute_code` call.
 
 > v3's `execute_code` is not listed in the MCP Tool Reference table below
 > (that table covers the shared `v1`/`v2` tool set defined in
@@ -366,7 +373,7 @@ The `v3` engine also serves over the MCP **streamable-http** transport, so like
 **not** spawn it. You must start it yourself **before** launching OpenCode:
 
 ```bash
-paraview-mcp v3 --paraview-server localhost --paraview-port 11111 --server localhost --port 8080
+paraview-mcp v3 --server localhost --port 8080
 ```
 
 The `paraview-v3` entry is a `"type": "remote"` MCP whose `url` must match the
@@ -389,12 +396,16 @@ giving `http://localhost:8080/mcp`:
 > Notes specific to v3:
 >
 > - v3 exposes a **single** tool, `execute_code`, which runs arbitrary
->   `paraview.simple` code on the server.
-> - The v3 engine process itself does **not** connect to `pvserver`; only its
->   `pv_runner.py` subprocess (run via `pvpython`) does, and it always uses
->   `localhost:11111`. **`pvserver` must be reachable on `localhost:11111`**
->   regardless of the `--paraview-server` / `--paraview-port` you pass.
-> - `pvpython` must be on your `PATH` (v3 shells out to it).
+>   `paraview.simple` code in a fresh, stateless session.
+> - v3 manages its own `pvserver` per call: each `execute_code` spawns a
+>   short-lived, single-client `pvserver` on an ephemeral local port and tears
+>   it down when the call finishes. You do **not** start `pvserver` manually
+>   for v3, and v3 takes **no** `--paraview-server` / `--paraview-port` flags.
+> - Both `pvserver` **and** `pvpython` must be on your `PATH` (v3 shells out to
+>   each per call).
+> - `execute_code` returns `returncode`, `runner_stdout`, `runner_stderr`,
+>   `pvserver_stdout`, `pvserver_stderr`, and writes per-call logs under
+>   `~/paraview_logs/`.
 > - v3 has **no** screenshot flags and **no** `--paraview-package-path`.
 > - v3 and v2 both bind `localhost:8080` by default — run only one at a time, or
 >   give them different `--port` values.

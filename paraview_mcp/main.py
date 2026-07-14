@@ -57,13 +57,12 @@ def main() -> None:
                 screenshot_quality=args.screenshot_quality,
             )
         elif args.engine == "v3":
-            # Imported lazily, after sys.path is extended, because importing
-            # this module pulls in paraview.simple.
+            # v3 is import-clean of paraview.simple (only its pv_runner.py
+            # subprocess imports ParaView), but keep the import lazy for
+            # symmetry with v1/v2.
             from paraview_mcp.v3 import pv_mcp
 
             pv_mcp.run(
-                paraview_server=args.paraview_server,
-                paraview_port=args.paraview_port,
                 mcp_server=args.server,
                 mcp_port=args.port,
             )
